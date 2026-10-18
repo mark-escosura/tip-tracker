@@ -2,7 +2,7 @@
    Data: localStorage only (key tiptracker.shifts.v1). No network requests at runtime. */
 (function () {
   'use strict';
-  var LOGGING = false;                // phase switch: false = motion preview only (demo data)
+  var LOGGING = true;                 // phase switch: false = motion preview only (demo data)
   var KEY = 'tiptracker.shifts.v1';
   var SHIFTS = ['breakfast', 'lunch', 'dinner', 'overnight'];
   var $ = function (s) { return document.querySelector(s); };
@@ -165,7 +165,7 @@
     // Chapter 1: this week
     $('#c1Big').textContent = money(W.take);
     $('#c1Line').innerHTML = W.n ? '<b>' + rate(W.rate) + '</b> take-home · ' + W.n + ' shift' + (W.n > 1 ? 's' : '') + ' · ' + r2(W.hours) + 'h' : 'No shifts yet this week. Log one below.';
-    $('#c1Split').textContent = W.n ? 'Cash ' + money(W.cash) + ' · Card ' + money(W.card) + (W.tipout ? ' · Tip-out −' + money(W.tipout).slice(1) : '') : '';
+    $('#c1Split').textContent = W.n ? 'Cash ' + money(W.cash) + ' · Card ' + money(W.card) + (W.tipout ? ' · Tip-out −' + money(W.tipout) : '') : '';
     // Chapter 2: jar
     $('#c2Big').textContent = W.take > 0 ? Math.round(S.fill * 100) + '% of your best week' : 'Empty jar';
     $('#c2Line').innerHTML = M.n ? 'This month: <b>' + money(M.take) + '</b> take-home · ' + rate(M.rate) : 'No shifts logged this month yet.';
@@ -201,7 +201,7 @@
       return '<div class="wk"><div class="wk-h"><span>Week of ' + nice(g.k).slice(4) + '</span><span>' + money(a.take) + ' · ' + rate(a.rate) + '</span></div>' +
         g.items.map(function (s) { var tk = take(s);
           return '<div class="shift" data-id="' + esc(s.id) + '"><div class="main"><div class="t">' + nice(s.date) + ' · ' + cap(s.shift) + (s.demo ? '<span class="demo-tag">DEMO</span>' : '') + '</div>' +
-            '<div class="d">' + s.hours + 'h · ' + money(s.cash) + ' cash · ' + money(s.card) + ' card' + (s.tipout ? ' · −' + money(s.tipout).slice(1) + ' tip-out' : '') +
+            '<div class="d">' + s.hours + 'h · ' + money(s.cash) + ' cash · ' + money(s.card) + ' card' + (s.tipout ? ' · −' + money(s.tipout) + ' tip-out' : '') +
             (s.sales ? ' · ' + money(s.sales) + ' sales' : '') + (s.note ? ' · ' + esc(s.note) : '') + '</div></div>' +
             '<div class="amt"><b>' + money(tk) + '</b><span>' + rate(tk / s.hours) + '</span></div>' +
             (s.demo ? '' : '<button class="icon-btn" data-act="edit" aria-label="Edit shift">✎</button><button class="icon-btn del" data-act="del" aria-label="Delete shift">✕</button>') + '</div>';
@@ -354,7 +354,7 @@
         fillEl.style.setProperty('--fill', (data.fill * sm(0.04, 0.34, p)).toFixed(4));
         jarEl.style.transform = 'rotateY(' + (Math.sin(p * Math.PI * 2) * 14) + 'deg) scale(' + (1 - sm(0.4, 0.6, p) * 0.12) + ')';
         var max = Math.max.apply(null, data.week.concat([1]));
-        for (var i = 0; i < 7; i++) { var rise = sm(0.36 + i * 0.025, 0.52 + i * 0.025, p);
+        for (var i = 0; i < 7; i++) { var rise = sm(0.34 + i * 0.012, 0.48 + i * 0.012, p);
           bars[i].style.height = Math.max(2, (data.week[i] / max) * 100 * rise) + '%'; bars[i].classList.toggle('today', i === data.today); }
         barsEl.style.transform = 'rotateX(' + (sm(0.62, 0.85, p) * 18 + h * 8) + 'deg) rotateY(' + (-12 + sm(0.35, 0.6, p) * 12 + sm(0.62, 0.85, p) * 10) + 'deg)';
       } };
@@ -364,7 +364,7 @@
   function initReveals() {
     if (revealsDone || reduced || !window.gsap) return; revealsDone = true;
     // history cards slide/fade in, scrubbed to scroll (linear)
-    gsap.utils.toArray('#log .glass, #history .glass').forEach(function (el) {
+    gsap.utils.toArray('#log .glass, #history > .glass').forEach(function (el) {
       gsap.fromTo(el, { y: 60, opacity: 0.25, scale: 0.97 }, { y: 0, opacity: 1, scale: 1, ease: 'none',
         scrollTrigger: { trigger: el, start: 'top 98%', end: 'top 70%', scrub: 1 } });
     });

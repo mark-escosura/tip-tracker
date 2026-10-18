@@ -1,5 +1,5 @@
 /* Tip Tracker service worker: full offline cache. Bump VERSION when files change. */
-var VERSION = 'tips-v1';
+var VERSION = 'tips-v3';
 var ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'js/scene3d.js', 'vendor/gsap.min.js', 'vendor/ScrollTrigger.min.js', 'vendor/lenis.min.js',
   'manifest.json', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-512-maskable.png'];
 self.addEventListener('install', function (e) {
