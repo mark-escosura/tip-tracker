@@ -73,7 +73,7 @@
         <label class="sr" for="quick">Quick entry</label>
         <div class="quick-wrap">
           <input id="quick" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"
-                 placeholder="6h dinner, 42 cash 31 card, tipped out 12">
+                 placeholder="6h dinner, 73 tips, tipped out 12">
         </div>
         <div id="quickPreview" class="preview" aria-live="polite" hidden></div>
         <div class="row-btns" id="quickBtns" hidden>
@@ -95,16 +95,15 @@
             <label><input type="radio" name="shift" value="overnight"><span>Overnight</span></label>
           </div>
           <div class="grid2">
-            <label class="field"><span>Cash tips $</span><input type="text" inputmode="decimal" id="fCash" placeholder="0"></label>
-            <label class="field"><span>Card tips $</span><input type="text" inputmode="decimal" id="fCard" placeholder="0"></label>
+            <label class="field"><span>Tips $</span><input type="text" inputmode="decimal" id="fTips" placeholder="0"></label>
+            <label class="field"><span>Tip-out $ <em>optional</em></span><input type="text" inputmode="decimal" id="fTipout" placeholder="0"></label>
           </div>
           <details class="more" id="more">
-            <summary>Sales, tip-out, note</summary>
+            <summary>Sales, note</summary>
             <div class="grid2">
               <label class="field"><span>Sales $ <em>optional</em></span><input type="text" inputmode="decimal" id="fSales" placeholder="—"></label>
-              <label class="field"><span>Tip-out $ <em>optional</em></span><input type="text" inputmode="decimal" id="fTipout" placeholder="0"></label>
+              <label class="field"><span>Note <em>optional</em></span><input type="text" id="fNote" maxlength="200" placeholder="Big party"></label>
             </div>
-            <label class="field"><span>Note <em>optional</em></span><input type="text" id="fNote" maxlength="200" placeholder="Busy Friday, big party"></label>
           </details>
           <p class="takehome" id="takeLine" aria-live="polite"></p>
           <p class="err" id="formErr" role="alert"></p>
@@ -116,10 +115,27 @@
       </div>
     </section>
 
+    <section id="calendar" aria-label="Calendar">
+      <div class="glass card cal-card">
+        <div class="cal-head">
+          <button type="button" class="icon-btn cal-nav" id="calPrev" aria-label="Previous month">&#8249;</button>
+          <div class="cal-title">
+            <p class="kicker" id="calMonth"></p>
+            <div class="cal-total" id="calTotal"></div>
+            <div class="cal-sub" id="calSub"></div>
+          </div>
+          <button type="button" class="icon-btn cal-nav" id="calNext" aria-label="Next month">&#8250;</button>
+        </div>
+        <div class="cal-dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+        <div class="cal-grid" id="calGrid" role="grid" aria-label="Month"></div>
+        <div class="cal-day" id="calDay" hidden></div>
+      </div>
+    </section>
+
     <section id="history" aria-label="History">
       <div class="totals" id="totals"></div>
       <div class="glass card reveal">
-        <div class="card-head"><h2>Best shifts</h2><span class="hint">by take-home $/hr</span></div>
+        <div class="card-head"><h2>Best shifts</h2><span class="hint">by total $/hr</span></div>
         <ol class="best" id="bestList"></ol>
       </div>
       <div class="glass card reveal">
@@ -127,8 +143,9 @@
         <div id="shiftList"></div>
       </div>
       <div class="glass card reveal">
-        <div class="card-head"><h2>Backup</h2><span class="hint">Data stays on this phone</span></div>
-        <p class="muted small">Export a CSV now and then. Import merges a CSV back in and skips duplicates.</p>
+        <div class="card-head"><h2>Settings &amp; backup</h2><span class="hint">Data stays on this phone</span></div>
+        <label class="field wage-field"><span>Base wage $/hr</span><input type="text" inputmode="decimal" id="fWage" placeholder="16.90"></label>
+        <p class="muted small">Wages = hours × base wage, used in every total. Export a CSV now and then; Import merges one back in and skips duplicates.</p>
         <div class="row-btns">
           <button type="button" class="btn" id="exportBtn">Export CSV</button>
           <label class="btn" for="importFile">Import CSV</label>
