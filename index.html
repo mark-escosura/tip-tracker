@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07080b">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tips">
+<meta name="description" content="Private tip tracker. Your shifts stay on your phone.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<title>Tip Tracker</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="stage" aria-hidden="true">
+  <canvas id="gl"></canvas>
+  <div id="fallback" hidden>
+    <div class="fb-scene">
+      <div class="fb-jar"><div class="fb-fill"></div><div class="fb-glass"></div><span class="fb-label">TIPS</span></div>
+      <div class="fb-bars"></div>
+    </div>
+  </div>
+  <div class="vignette"></div>
+</div>
+
+<header class="topbar">
+  <div class="brand"><span class="brand-dot"></span>Tip Tracker</div>
+  <span id="demoBadge" class="badge" hidden>Demo data</span>
+</header>
+
+<main id="main">
+  <section id="hero" aria-label="Dashboard">
+    <div class="chapters">
+      <article class="chapter" id="ch1">
+        <p class="kicker">This week</p>
+        <h1 class="big" id="c1Big">—</h1>
+        <p class="line" id="c1Line"></p>
+        <p class="line muted" id="c1Split"></p>
+      </article>
+      <article class="chapter" id="ch2">
+        <p class="kicker">Tip jar</p>
+        <h2 class="mid" id="c2Big">—</h2>
+        <p class="line" id="c2Line"></p>
+      </article>
+      <article class="chapter" id="ch3">
+        <p class="kicker">Day by day</p>
+        <h2 class="mid" id="c3Big">—</h2>
+        <p class="line" id="c3Line"></p>
+      </article>
+      <article class="chapter" id="ch4">
+        <p class="kicker">Best shift</p>
+        <h2 class="mid" id="c4Big">—</h2>
+        <p class="line" id="c4Line"></p>
+        <p class="line muted" id="c4All"></p>
+      </article>
+    </div>
+    <div class="rail"><div class="rail-fill" id="railFill"></div></div>
+    <div class="cue" id="cue">Scroll<span class="cue-arrow"></span></div>
+  </section>
+
+  <div id="after">
+    <section id="log" aria-label="Log a shift">
+      <div class="glass card log-card">
+        <div class="card-head"><h2>Log a shift</h2><span class="hint" id="logHint">Under 10 seconds</span></div>
+        <div id="logLocked" class="locked" hidden>Logging turns on in the next update. This build is the motion preview.</div>
+
+        <label class="sr" for="quick">Quick entry</label>
+        <div class="quick-wrap">
+          <input id="quick" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"
+                 placeholder="6h dinner, 42 cash 31 card, tipped out 12">
+        </div>
+        <div id="quickPreview" class="preview" aria-live="polite" hidden></div>
+        <div class="row-btns" id="quickBtns" hidden>
+          <button type="button" class="btn gold" id="quickSave">Save shift</button>
+          <button type="button" class="btn ghost" id="quickToForm">Edit in form</button>
+        </div>
+
+        <div class="divider"><span>or tap it in</span></div>
+
+        <form id="form" novalidate>
+          <div class="grid2">
+            <label class="field"><span>Date</span><input type="date" id="fDate" required></label>
+            <label class="field"><span>Hours</span><input type="text" inputmode="decimal" id="fHours" placeholder="6" required></label>
+          </div>
+          <div class="seg" role="radiogroup" aria-label="Shift">
+            <label><input type="radio" name="shift" value="breakfast"><span>Breakfast</span></label>
+            <label><input type="radio" name="shift" value="lunch"><span>Lunch</span></label>
+            <label><input type="radio" name="shift" value="dinner"><span>Dinner</span></label>
+            <label><input type="radio" name="shift" value="overnight"><span>Overnight</span></label>
+          </div>
+          <div class="grid2">
+            <label class="field"><span>Cash tips $</span><input type="text" inputmode="decimal" id="fCash" placeholder="0"></label>
+            <label class="field"><span>Card tips $</span><input type="text" inputmode="decimal" id="fCard" placeholder="0"></label>
+          </div>
+          <details class="more" id="more">
+            <summary>Sales, tip-out, note</summary>
+            <div class="grid2">
+              <label class="field"><span>Sales $ <em>optional</em></span><input type="text" inputmode="decimal" id="fSales" placeholder="—"></label>
+              <label class="field"><span>Tip-out $ <em>optional</em></span><input type="text" inputmode="decimal" id="fTipout" placeholder="0"></label>
+            </div>
+            <label class="field"><span>Note <em>optional</em></span><input type="text" id="fNote" maxlength="200" placeholder="Busy Friday, big party"></label>
+          </details>
+          <p class="takehome" id="takeLine" aria-live="polite"></p>
+          <p class="err" id="formErr" role="alert"></p>
+          <div class="row-btns">
+            <button type="submit" class="btn gold" id="saveBtn">Save shift</button>
+            <button type="button" class="btn ghost" id="cancelEdit" hidden>Cancel edit</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section id="history" aria-label="History">
+      <div class="totals" id="totals"></div>
+      <div class="glass card reveal">
+        <div class="card-head"><h2>Best shifts</h2><span class="hint">by take-home $/hr</span></div>
+        <ol class="best" id="bestList"></ol>
+      </div>
+      <div class="glass card reveal">
+        <div class="card-head"><h2>Shifts</h2><span class="hint" id="shiftCount"></span></div>
+        <div id="shiftList"></div>
+      </div>
+      <div class="glass card reveal">
+        <div class="card-head"><h2>Backup</h2><span class="hint">Data stays on this phone</span></div>
+        <p class="muted small">Export a CSV now and then. Import merges a CSV back in and skips duplicates.</p>
+        <div class="row-btns">
+          <button type="button" class="btn" id="exportBtn">Export CSV</button>
+          <label class="btn" for="importFile">Import CSV</label>
+          <input type="file" id="importFile" accept=".csv,text/csv" hidden>
+        </div>
+      </div>
+      <footer class="foot">Private: no accounts, no tracking, nothing leaves this phone.</footer>
+    </section>
+  </div>
+</main>
+
+<button class="fab" id="fab" type="button" aria-label="Log a shift">+ Log</button>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="vendor/gsap.min.js"></script>
+<script src="vendor/ScrollTrigger.min.js"></script>
+<script src="vendor/lenis.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
