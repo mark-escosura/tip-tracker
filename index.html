@@ -73,7 +73,7 @@
         <label class="sr" for="quick">Quick entry</label>
         <div class="quick-wrap">
           <input id="quick" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"
-                 placeholder="6h dinner, 73 tips, tipped out 12">
+                 placeholder="4pm-11 dinner, 73 tips, tipped out 12">
         </div>
         <div id="quickPreview" class="preview" aria-live="polite" hidden></div>
         <div class="row-btns" id="quickBtns" hidden>
@@ -86,7 +86,11 @@
         <form id="form" novalidate>
           <div class="grid2">
             <label class="field"><span>Date</span><input type="date" id="fDate" required></label>
-            <label class="field"><span>Hours</span><input type="text" inputmode="decimal" id="fHours" placeholder="6" required></label>
+            <label class="field"><span>Hours <em id="hoursHint"></em></span><input type="text" inputmode="decimal" id="fHours" placeholder="6" required></label>
+          </div>
+          <div class="grid2">
+            <label class="field"><span>Clock in <em>optional</em></span><input type="time" id="fIn"></label>
+            <label class="field"><span>Clock out <em>optional</em></span><input type="time" id="fOut"></label>
           </div>
           <div class="seg" role="radiogroup" aria-label="Shift">
             <label><input type="radio" name="shift" value="breakfast"><span>Breakfast</span></label>

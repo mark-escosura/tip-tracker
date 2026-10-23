@@ -187,3 +187,5 @@ input[type=date]{color-scheme:dark}
 .cal-day .daysum{color:var(--muted);font-size:14px;margin-bottom:6px}
 .cal-day .preview{margin-top:8px}
 .wage-field{max-width:200px;margin-bottom:8px}
+
+input[type=time]{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:14px;padding:13px 14px;font-size:17px;outline:none;-webkit-appearance:none;appearance:none;min-height:50px;color-scheme:dark}
