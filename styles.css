@@ -216,3 +216,4 @@ details.fold[open]>summary{margin-bottom:10px}#calAdd{margin-top:12px}
 .dgrid-wrap{overflow-x:auto}.dgrid{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
 .dgrid th{font-weight:600;color:var(--muted);padding:4px 2px;text-align:center}.dgrid td{text-align:center;padding:4px 2px;border-top:1px solid rgba(255,255,255,.05)}
 .dgrid td b{display:block;font-size:12.5px}.dgrid td span{color:var(--muted);font-size:10.5px}.dgrid td.none{color:var(--muted)}
+.cal-cell.sched.future{opacity:1}
