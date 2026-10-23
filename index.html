@@ -68,6 +68,7 @@
     <section id="log" aria-label="Log a shift">
       <div class="glass card log-card">
         <div class="card-head"><h2>Log a shift</h2><span class="hint" id="logHint">Under 10 seconds</span></div>
+        <div class="banner" id="logBanner" hidden><button type="button" id="bannerText"></button><button type="button" id="bannerX" aria-label="Not now">✕</button></div>
         <div id="logLocked" class="locked" hidden>Logging turns on in the next update. This build is the motion preview.</div>
 
         <label class="sr" for="quick">Quick entry</label>
@@ -130,6 +131,19 @@
         <div class="cal-dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
         <div class="cal-grid" id="calGrid" role="grid" aria-label="Month"></div>
         <button type="button" class="btn gold btn-big" id="calAdd">Add shift</button>
+        <form class="sched-form" id="schedForm" hidden novalidate>
+          <h3 id="schedTitle">Add a scheduled shift</h3>
+          <label class="field"><span>Date</span><input type="date" id="sDate" required></label>
+          <div class="seg roles" id="sRoles" role="radiogroup" aria-label="Role"></div>
+          <div class="grid2">
+            <label class="field"><span>Start</span><input type="time" id="sStart"></label>
+            <label class="field"><span>End</span><input type="time" id="sEnd"></label>
+          </div>
+          <p class="muted small" id="sHint"></p>
+          <p class="err" id="sErr" role="alert"></p>
+          <div class="row-btns"><button type="submit" class="btn gold" id="sSave">Add to schedule</button><button type="button" class="btn ghost" id="sCancel">Cancel</button><button type="button" class="btn ghost del" id="sDel" hidden>Delete</button></div>
+        </form>
+        <button type="button" class="btn ghost" id="icsBtn" hidden>Add to iPhone Calendar</button>
         <div class="cal-day" id="calDay" hidden></div>
       </div>
     </section>
@@ -142,6 +156,8 @@
       <details class="glass card reveal fold" id="bestWrap">
         <summary><b>Your best shifts</b> <span id="bestSum" class="muted"></span></summary>
         <ol class="best" id="bestList"></ol>
+        <p class="k small muted">Average take-home by day and shift ($/hr · shifts)</p>
+        <div id="dayGrid" class="dgrid-wrap"></div>
       </details>
       <div class="glass card reveal">
         <div class="card-head"><h2>Shifts</h2><span class="hint" id="shiftCount"></span></div>

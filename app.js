@@ -240,9 +240,20 @@
     var b0 = S.best[0]; $('#bestSum').textContent = b0 ? '· top $' + b0.rate.toFixed(2) + '/hr on ' + nice(b0.s.date) : '· none yet';
     var now = new Date(), dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(), dd = now.getDate();
     $('#paceWrap').hidden = !M.n;
-    if (M.n) { var pace = M.take / dd * dim;
-      $('#paceLine').innerHTML = 'On pace for <b>' + money(pace) + '</b> this month';
-      $('#paceMore').innerHTML = 'So far: ' + money(M.take) + ' in ' + dd + ' of ' + dim + ' days (' + M.n + ' shift' + (M.n > 1 ? 's' : '') + ').<br>If the rest of the month goes like the first ' + dd + ' days, that\'s about ' + money(pace) + '.'; }
+    if (M.n) { var ymNow = iso(now).slice(0, 7), real = demo ? [] : list;
+      var rest = demo ? [] : sched.filter(function (x) { return x.date.slice(0, 7) === ymNow && schedStart(x) > now && !schedLogged(x) && (!roleFilter || x.role === roleFilter); });
+      var est = 0, used = 0, skip = 0; rest.forEach(function (x) { var g = similarAvg(x, real); if (g) { est += g.v; used++; } else skip++; });
+      if (used) { var pace = M.take + est;
+        $('#paceLine').innerHTML = 'On pace for <b>' + money(pace) + '</b> this month';
+        $('#paceMore').innerHTML = 'So far: ' + money(M.take) + ' (' + M.n + ' shift' + (M.n > 1 ? 's' : '') + ').<br>Plus ' + used + ' scheduled shift' + (used > 1 ? 's' : '') + ' left, each at the average take-home of your past shifts like it: about ' + money(est) + '.' +
+          (skip ? '<br>' + skip + ' scheduled shift' + (skip > 1 ? 's' : '') + ' not counted (no similar shifts logged yet).' : ''); }
+      else { var pace2 = M.take / dd * dim;
+        $('#paceLine').innerHTML = 'On pace for <b>' + money(pace2) + '</b> this month';
+        $('#paceMore').innerHTML = 'So far: ' + money(M.take) + ' in ' + dd + ' of ' + dim + ' days (' + M.n + ' shift' + (M.n > 1 ? 's' : '') + ').<br>If the rest of the month goes like the first ' + dd + ' days, that\'s about ' + money(pace2) + '.' + (rest.length ? '<br>' + rest.length + ' scheduled shift' + (rest.length > 1 ? 's' : '') + ' not counted (no similar shifts logged yet).' : ''); } }
+    var GR = {}; list.forEach(function (s) { if (!(s.hours > 0)) return; var k = ((fromIso(s.date).getDay() + 6) % 7) + s.shift; (GR[k] = GR[k] || []).push(s); });
+    $('#dayGrid').innerHTML = '<table class="dgrid" aria-label="Average take-home by day and shift"><thead><tr><th></th>' + SHIFTS.map(function (sh) { return '<th>' + cap(sh) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(function (dn, di) { return '<tr><th>' + dn + '</th>' + SHIFTS.map(function (sh) { var g = GR[di + sh];
+        if (!g) return '<td class="none">·</td>'; var A2 = agg(g); return '<td data-k="' + dn + '-' + sh + '"><b>' + money(A2.take / A2.n) + '</b><span>' + rate(A2.rate).replace('/hr', '') + '/h · ' + A2.n + '</span></td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>';
     $('#bestList').innerHTML = S.best.length ? S.best.map(function (x) {
       return '<li><div class="who">' + nice(x.s.date) + ' · ' + cap(x.s.shift) + '<div class="sub">' + x.s.hours + 'h · ' + money(take(x.s)) + ' take-home · tips ' + rate(netTips(x.s) / x.s.hours) + '</div></div><div class="rate">$' + x.rate.toFixed(2) + '/hr</div></li>';
     }).join('') : '<li class="empty" style="counter-increment:none">Log a shift to see your best ones.</li>';
@@ -253,7 +264,7 @@
     $('#shiftList').innerHTML = groups.length ? groups.map(function (g) { var a = agg(g.items);
       return '<div class="wk"><div class="wk-h"><span>Week of ' + nice(g.k).slice(4) + '</span><span>' + money(a.take) + ' · ' + rate(a.rate) + '</span></div>' +
         g.items.map(shiftRow).join('') + '</div>'; }).join('') : '<div class="empty">No shifts yet.</div>';
-    renderCalendar();
+    renderCalendar(); renderBanner(); $('#icsBtn').hidden = !upcoming().length;
 
     var d3 = { week: S.days.slice(), weekTotal: W.take, fill: S.fill, today: S.today, money: function (v) { return money(Math.round(v)); },
       bigLabel: money(Math.round(W.take)), subLabel: demo ? 'DEMO · this week' : 'this week · take-home',
@@ -274,26 +285,27 @@
     $('#calMonth').textContent = MONTHS[m] + ' ' + y + (isDemo() ? ' · demo' : '');
     $('#calTotal').textContent = money(a.take);
     $('#calSub').textContent = a.n ? a.n + ' shift' + (a.n > 1 ? 's' : '') + ' · ' + r2(a.hours) + 'h · ' + rate(a.rate) + ' · tips ' + money(a.tips) : 'No shifts this month';
+    var sByDay = {}; sched.forEach(function (x) { if (x.date.slice(0, 7) === ym && !schedLogged(x)) (sByDay[x.date] = sByDay[x.date] || []).push(x); });
     var totals = {}, max = 0; Object.keys(byDay).forEach(function (d) { totals[d] = byDay[d].reduce(function (t, s) { return t + take(s); }, 0); if (totals[d] > max) max = totals[d]; });
     var first = new Date(y, m, 1), lead = (first.getDay() + 6) % 7, days = new Date(y, m + 1, 0).getDate(), todayIso = iso(new Date()), html = '', i = 0;
     for (var k = 0; k < lead; k++, i++) html += '<div class="cal-cell blank" style="--i:' + i + '" aria-hidden="true"></div>';
     for (var d = 1; d <= days; d++, i++) {
-      var di = ym + '-' + pad(d), v = totals[di] || 0, n = (byDay[di] || []).length, heat = max > 0 ? v / max : 0;
-      var cls = 'cal-cell' + (n ? ' has' : '') + (heat > 0.55 ? ' hot' : '') + (di === todayIso ? ' today' : '') + (di === calSel ? ' sel' : '') + (di > todayIso ? ' future' : '');
+      var di = ym + '-' + pad(d), v = totals[di] || 0, n = (byDay[di] || []).length, heat = max > 0 ? v / max : 0, sc = sByDay[di] || [];
+      var cls = 'cal-cell' + (n ? ' has' : '') + (heat > 0.55 ? ' hot' : '') + (di === todayIso ? ' today' : '') + (di === calSel ? ' sel' : '') + (di > todayIso ? ' future' : '') + (sc.length ? ' sched' : '');
       var bg = n ? 'background:linear-gradient(160deg,rgba(255,210,122,' + (0.18 + heat * 0.72).toFixed(3) + '),rgba(242,184,75,' + (0.08 + heat * 0.6).toFixed(3) + '));' : '';
-      html += '<button type="button" class="' + cls + '" data-date="' + di + '" style="--i:' + i + ';' + bg + '" aria-label="' + nice(di) + (n ? ', ' + money(v) + ' take-home' : ', no shifts') + '">' +
+      html += '<button type="button" class="' + cls + '" data-date="' + di + '" style="--i:' + i + ';' + bg + '" aria-label="' + nice(di) + (n ? ', ' + money(v) + ' take-home' : ', no shifts') + (sc.length ? ', scheduled ' + fmtTime(sc[0].start) : '') + '">' +
         '<span class="dn">' + d + '</span>' + (n > 1 ? '<span class="dots">' + new Array(Math.min(n, 3) + 1).join('<i></i>') + '</span>' : '') +
-        '<span class="dv">' + (n ? short$(v) : '') + '</span></button>';
+        '<span class="dv">' + (n ? short$(v) : '') + '</span>' + (sc.length ? '<span class="sc">' + fmtTime(sc[0].start).replace(/(am|pm)$/, function (q) { return q[0]; }) + '</span>' : '') + '</button>';
     }
     $('#calGrid').innerHTML = html;
     renderDay();
   }
   function renderDay() {
     var el = $('#calDay'); if (!calSel) { el.hidden = true; el.innerHTML = ''; return; }
-    var list = dataset().filter(function (s) { return s.date === calSel; }), a = agg(list);
+    var list = dataset().filter(function (s) { return s.date === calSel; }), a = agg(list), sl = sched.filter(function (x) { return x.date === calSel; });
     var keep = $('#dayQuick') ? $('#dayQuick').value : '';
     el.innerHTML = '<h3>' + nice(calSel) + '</h3><div class="daysum">' + (a.n ? money(a.take) + ' take-home · ' + rate(a.rate) + ' · ' + a.n + ' shift' + (a.n > 1 ? 's' : '') : 'No shifts this day') + '</div>' +
-      list.map(shiftRow).join('') +
+      list.map(shiftRow).join('') + sl.map(schedRow).join('') +
       (LOGGING ? '<div class="quick-wrap" style="margin-top:10px"><label class="sr" for="dayQuick">Log on this day</label><input id="dayQuick" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="Log here: 6h dinner, 73 tips"></div>' +
         '<div id="dayPreview" class="preview" hidden></div>' +
         '<div class="row-btns"><button type="button" class="btn gold" id="daySave" disabled>Save to ' + nice(calSel).slice(4) + '</button><button type="button" class="btn ghost" id="dayForm">Full form</button></div>' : '');
@@ -332,9 +344,86 @@
         $('#dayQuick').value = ''; commit(fromParsed(dayParsed, keepSel)); calSel = keepSel; renderCalendar(); return; }
       if (e.target.id === 'dayForm') { var p = $('#dayQuick') && $('#dayQuick').value.trim() ? parseQuick($('#dayQuick').value) : null;
         resetForm(); if (p) fillForm(fromParsed(p, calSel)); $('#fDate').value = calSel; goTo('#log', function () { $('#fHours').focus({ preventScroll: true }); }); return; }
-      onShiftAction(e);
+      if (onSchedAction(e)) return; onShiftAction(e);
     });
   }
+
+  /* ---------------- work schedule (upcoming shifts, stored apart from logged ones) ---------------- */
+  var SCHED_KEY = 'tiptracker.schedule.v1';
+  function validSched(x) { return x && typeof x.id === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.date) && okTime(x.start) && okTime(x.end) && SHIFTS.indexOf(x.shift) >= 0; }
+  function loadSched() { try { var a = JSON.parse(localStorage.getItem(SCHED_KEY) || '[]'); return Array.isArray(a) ? a.filter(validSched) : []; } catch (e) { return []; } }
+  var sched = loadSched();
+  function saveSched() { localStorage.setItem(SCHED_KEY, JSON.stringify(sched)); }
+  function schedStart(x) { var d = fromIso(x.date); d.setHours(+x.start.slice(0, 2), +x.start.slice(3), 0, 0); return d; }
+  function schedEnd(x) { var d = fromIso(x.date); d.setHours(+x.end.slice(0, 2), +x.end.slice(3), 0, 0); if (x.end <= x.start) d.setDate(d.getDate() + 1); return d; }
+  function schedLogged(x) { return !!x.logged || shifts.some(function (s) { return s.date === x.date && s.shift === x.shift && (!x.role || s.role === x.role); }); }
+  function schedLabel(x) { return DOW[fromIso(x.date).getDay()] + ' ' + x.shift; }
+  function upcoming() { var now = new Date(); return sched.filter(function (x) { return schedEnd(x) > now; }).sort(function (a, b) { return schedStart(a) - schedStart(b); }); }
+  function dueToLog() { var now = new Date(), cut = addDays(now, -14);
+    return sched.filter(function (x) { var e = schedEnd(x); return e <= now && e > cut && !x.dismissed && !schedLogged(x); }).sort(function (a, b) { return schedEnd(b) - schedEnd(a); }); }
+  var pendingSched = null;
+  function renderBanner() { var d = LOGGING ? dueToLog()[0] : null, b = $('#logBanner');
+    b.hidden = !d; if (d) { b.setAttribute('data-sid', d.id); $('#bannerText').textContent = 'Log your ' + schedLabel(d) + ' shift?'; } }
+  function openFromSched(x) { resetForm(); fillForm({ date: x.date, shift: x.shift, role: x.role || null, clockIn: x.start, clockOut: x.end, hours: spanHours(x.start, x.end), tips: null, tipout: 0 });
+    pendingSched = x.id; goTo('#log', function () { $('#fTips').focus({ preventScroll: true }); }); }
+  /* schedule form (inside the calendar card) */
+  var schedEditing = null;
+  function renderSchedRoles(cur) { $('#sRoles').hidden = roles.length < 2;
+    $('#sRoles').innerHTML = roles.map(function (r) { return '<label><input type="radio" name="srole" value="' + esc(r.name) + '"' + (r.name === cur ? ' checked' : '') + '><span>' + esc(r.name) + '</span></label>'; }).join(''); }
+  function schedHint() { var a = normTime($('#sStart').value), b = normTime($('#sEnd').value), g = shiftFor(a), h = spanHours(a, b);
+    $('#sHint').textContent = g ? cap(g) + ' shift' + (h ? ' · ' + h + 'h' + (b <= a ? ' (ends next day)' : '') : '') : ''; }
+  function openSchedForm(x) { schedEditing = x ? x.id : null; $('#schedTitle').textContent = x ? 'Edit scheduled shift' : 'Add a scheduled shift';
+    $('#sDate').value = x ? x.date : (calSel && calSel >= iso(new Date()) ? calSel : iso(new Date()));
+    renderSchedRoles(x && x.role ? x.role : defaultRole().name); $('#sStart').value = x ? x.start : ''; $('#sEnd').value = x ? x.end : '';
+    $('#sErr').textContent = ''; $('#sDel').hidden = !x; $('#sSave').textContent = x ? 'Save changes' : 'Add to schedule'; $('#schedForm').hidden = false; schedHint();
+    if (window.ScrollTrigger) ScrollTrigger.refresh(); }
+  function closeSchedForm() { $('#schedForm').hidden = true; schedEditing = null; if (window.ScrollTrigger) ScrollTrigger.refresh(); }
+  function submitSched() { var d = $('#sDate').value, a = normTime($('#sStart').value), b = normTime($('#sEnd').value), rr = document.querySelector('input[name=srole]:checked');
+    var err = !/^\d{4}-\d{2}-\d{2}$/.test(d || '') ? 'Pick a date.' : !a || !b ? 'Add a start and end time.' : a === b ? 'Start and end can\'t be the same.' : '';
+    var rec = { id: schedEditing || 'c' + uid().slice(1), date: d, start: a, end: b, shift: shiftFor(a), role: rr ? rr.value : defaultRole().name };
+    if (!err && schedEnd(rec) <= new Date()) err = 'That time has already passed. Pick an upcoming shift.';
+    $('#sErr').textContent = err; if (err) return;
+    var i = sched.findIndex(function (x) { return x.id === rec.id; }); if (i >= 0) { rec.rev = (sched[i].rev || 0) + 1; sched[i] = rec; } else sched.push(rec);
+    saveSched(); closeSchedForm(); calSel = rec.date; calMonth = new Date(fromIso(d).getFullYear(), fromIso(d).getMonth(), 1); renderAll();
+    toast((i >= 0 ? 'Updated · ' : 'Scheduled · ') + nice(rec.date) + ' ' + fmtTime(a) + '–' + fmtTime(b)); }
+  function schedRow(x) { var past = schedEnd(x) <= new Date(), lg = schedLogged(x);
+    return '<div class="shift srow" data-sid="' + x.id + '"><div class="main"><div class="t">' + cap(x.shift) + ' · scheduled' + (roles.length > 1 || (x.role && !roleByName(x.role)) ? ' · ' + esc(x.role) : '') + '</div><div class="d">' + fmtTime(x.start) + '–' + fmtTime(x.end) + ' · ' + spanHours(x.start, x.end) + 'h' + (lg ? ' · logged' : past ? ' · not logged yet' : '') + '</div></div>' +
+      (past && !lg && LOGGING ? '<button class="btn" data-sact="log">Log</button>' : '') + '<button class="icon-btn" data-sact="edit" aria-label="Edit scheduled shift">✎</button><button class="icon-btn del" data-sact="del" aria-label="Delete scheduled shift">✕</button></div>'; }
+  function onSchedAction(e) { var b = e.target.closest('[data-sact]'); if (!b) return false; var id = b.closest('[data-sid]').getAttribute('data-sid'), x = sched.find(function (y) { return y.id === id; }); if (!x) return true;
+    var a = b.getAttribute('data-sact');
+    if (a === 'edit') openSchedForm(x); else if (a === 'log') openFromSched(x);
+    else if (confirm('Remove ' + nice(x.date) + ' ' + x.shift + ' from your schedule?')) { sched = sched.filter(function (y) { return y.id !== id; }); saveSched(); if (schedEditing === id) closeSchedForm(); renderAll(); toast('Removed from schedule'); }
+    return true; }
+  /* .ics export: upcoming shifts, 1h-before alarm + "Log your tips" alarm at end. Stable UID per scheduled shift. */
+  function icsDate(d) { return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''); }
+  function icsText(s) { return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
+  function icsFold(l) { var out = []; while (l.length > 73) { out.push(l.slice(0, 73)); l = ' ' + l.slice(73); } out.push(l); return out.join('\r\n'); }
+  function buildICS(list) { var now = icsDate(new Date()), L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Tip Tracker//Schedule//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:Work shifts'];
+    list.forEach(function (x) { var t = cap(x.shift) + ' shift' + (x.role ? ' (' + x.role + ')' : '');
+      L.push('BEGIN:VEVENT', 'UID:' + x.id + '@tip-tracker.mark-escosura.github.io', 'SEQUENCE:' + Math.floor((x.rev || 0)), 'DTSTAMP:' + now, 'DTSTART:' + icsDate(schedStart(x)), 'DTEND:' + icsDate(schedEnd(x)),
+        'SUMMARY:' + icsText(t), 'DESCRIPTION:' + icsText('Scheduled ' + fmtTime(x.start) + '–' + fmtTime(x.end) + '. After your shift, open Tip Tracker to log your tips.'),
+        'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsText(t + ' starts in 1 hour'), 'TRIGGER:-PT1H', 'END:VALARM',
+        'BEGIN:VALARM', 'ACTION:DISPLAY', 'SUMMARY:Log your tips', 'DESCRIPTION:Log your tips', 'TRIGGER;RELATED=END:PT0S', 'END:VALARM', 'END:VEVENT'); });
+    L.push('END:VCALENDAR'); return L.map(icsFold).join('\r\n') + '\r\n'; }
+  function downloadICS() { var list = upcoming(); if (!list.length) { toast('Add an upcoming shift first'); return; }
+    var url = URL.createObjectURL(new Blob([buildICS(list)], { type: 'text/calendar;charset=utf-8' })), a = document.createElement('a');
+    a.href = url; a.download = 'work-shifts.ics'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    toast(list.length + ' shift' + (list.length > 1 ? 's' : '') + ' ready for Calendar. Re-adding updates them.'); }
+  /* forecast helper: average take-home of similar logged shifts (same role + shift, else same shift). null = nothing similar yet */
+  function similarAvg(x, list) { var m = list.filter(function (s) { return s.shift === x.shift && s.role === x.role; });
+    if (!m.length) m = list.filter(function (s) { return s.shift === x.shift; }); return m.length ? { v: agg(m).take / m.length, n: m.length } : null; }
+  function bindSchedule() {
+    $('#calAdd').addEventListener('click', function () { openSchedForm(null); setTimeout(function () { $('#sStart').focus({ preventScroll: true }); }, 50); });
+    $('#schedForm').addEventListener('submit', function (e) { e.preventDefault(); submitSched(); });
+    $('#schedForm').addEventListener('input', schedHint);
+    $('#sCancel').addEventListener('click', closeSchedForm);
+    $('#sDel').addEventListener('click', function () { var x = sched.find(function (y) { return y.id === schedEditing; }); if (!x || !confirm('Remove ' + nice(x.date) + ' ' + x.shift + ' from your schedule?')) return;
+      sched = sched.filter(function (y) { return y.id !== x.id; }); saveSched(); closeSchedForm(); renderAll(); toast('Removed from schedule'); });
+    $('#icsBtn').addEventListener('click', downloadICS);
+    $('#bannerText').addEventListener('click', function () { var x = sched.find(function (y) { return y.id === $('#logBanner').getAttribute('data-sid'); }); if (x) openFromSched(x); });
+    $('#bannerX').addEventListener('click', function () { var x = sched.find(function (y) { return y.id === $('#logBanner').getAttribute('data-sid'); }); if (x) { x.dismissed = true; saveSched(); } renderBanner(); });
+  }
+  window.addEventListener('storage', function (e) { if (e.key === SCHED_KEY) { sched = loadSched(); renderAll(); } });
 
   function lockUI() {
     $('#logLocked').hidden = LOGGING; $('.log-card').classList.toggle('is-locked', !LOGGING);
@@ -348,7 +437,7 @@
   /* ---------------- form ---------------- */
   var editing = null;
   function resetForm() {
-    editing = null; $('#form').reset(); $('#fDate').value = iso(new Date());
+    editing = null; pendingSched = null; $('#form').reset(); $('#fDate').value = iso(new Date());
     renderRoleChips(); setRole(defaultRole().name); formWage = null; $('#hoursHint').textContent = ''; $('#saveBtn').textContent = 'Add shift'; shiftTouched = false; guessShift(); $('#roleChips').hidden = roles.length < 2; $('#cancelEdit').hidden = true; $('#formErr').textContent = ''; $('#more').open = false; updateTakeLine();
   }
   /* shift type auto-guessed from clock-in; one tap overrides */
@@ -414,7 +503,8 @@
     var msg;
     if (editing) { var i = shifts.findIndex(function (s) { return s.id === editing; }); if (i >= 0) { rec.id = editing; rec.createdAt = shifts[i].createdAt; shifts[i] = rec; } msg = 'Updated'; }
     else { rec.id = uid(); rec.createdAt = new Date().toISOString(); shifts.push(rec); msg = 'Saved'; }
-    save(); renderAll(); toast(msg + ' · ' + money(take(rec)) + ' take-home · ' + rate(take(rec) / rec.hours));
+    if (pendingSched && !editing) { var ps = sched.find(function (x) { return x.id === pendingSched; }); if (ps) { ps.logged = rec.id; saveSched(); } }
+    pendingSched = null; save(); renderAll(); toast(msg + ' · ' + money(take(rec)) + ' take-home · ' + rate(take(rec) / rec.hours));
     resetForm();
   }
 
@@ -468,14 +558,13 @@
     return true;
   }
   function bindUI() {
-    resetForm(); bindCalendar();
+    resetForm(); bindCalendar(); bindSchedule();
     renderRoleSettings(); bindRoles();
     $('#fIn').addEventListener('change', onClockChange); $('#fOut').addEventListener('change', onClockChange);
     $('#fIn').addEventListener('input', onClockChange); $('#fOut').addEventListener('input', onClockChange);
     $('#fHours').addEventListener('input', hoursHint);
     $('#form').addEventListener('input', updateTakeLine); $('#form').addEventListener('input', moreSummary);
     Array.prototype.forEach.call(document.querySelectorAll('input[name=shift]'), function (r) { r.addEventListener('change', function () { shiftTouched = true; }); });
-    $('#calAdd').addEventListener('click', function () { resetForm(); var d = typeof calSel === 'string' && calSel ? calSel : iso(new Date()); $('#fDate').value = d; moreSummary(); goTo('#log', function () { $('#fIn').focus({ preventScroll: true }); }); });
     $('#form').addEventListener('change', updateTakeLine);
     $('#form').addEventListener('submit', function (e) { e.preventDefault(); if (!LOGGING) return;
       var f = readForm(), err = validate(f); $('#formErr').textContent = err; if (/Hours|Pick a date|numbers/.test(err)) $('#more').open = true; if (!err) commit(f); });
@@ -599,6 +688,6 @@
     renderAll();
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function () {});
   }
-  window.__ttTest = { parseQuick: parseQuick, wage: function () { return wage; }, roles: function () { return roles; } };
+  window.__ttTest = { parseQuick: parseQuick, wage: function () { return wage; }, roles: function () { return roles; }, buildICS: function () { return buildICS(upcoming()); }, sched: function () { return sched; } };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
