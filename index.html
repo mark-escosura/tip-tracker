@@ -81,16 +81,13 @@
           <button type="button" class="btn ghost" id="quickToForm">Edit in form</button>
         </div>
 
-        <div class="divider"><span>or tap it in</span></div>
+        <div class="divider"><span>or fill it in</span></div>
 
         <form id="form" novalidate>
+          <div class="seg roles" id="roleChips" role="radiogroup" aria-label="Role"></div>
           <div class="grid2">
-            <label class="field"><span>Date</span><input type="date" id="fDate" required></label>
-            <label class="field"><span>Hours <em id="hoursHint"></em></span><input type="text" inputmode="decimal" id="fHours" placeholder="6" required></label>
-          </div>
-          <div class="grid2">
-            <label class="field"><span>Clock in <em>optional</em></span><input type="time" id="fIn"></label>
-            <label class="field"><span>Clock out <em>optional</em></span><input type="time" id="fOut"></label>
+            <label class="field"><span>Clock in</span><input type="time" id="fIn"></label>
+            <label class="field"><span>Clock out</span><input type="time" id="fOut"></label>
           </div>
           <div class="seg" role="radiogroup" aria-label="Shift">
             <label><input type="radio" name="shift" value="breakfast"><span>Breakfast</span></label>
@@ -98,23 +95,23 @@
             <label><input type="radio" name="shift" value="dinner"><span>Dinner</span></label>
             <label><input type="radio" name="shift" value="overnight"><span>Overnight</span></label>
           </div>
-          <div class="grid2">
-            <label class="field"><span>Tips $</span><input type="text" inputmode="decimal" id="fTips" placeholder="0"></label>
-            <label class="field"><span>Tip-out $ <em>optional</em></span><input type="text" inputmode="decimal" id="fTipout" placeholder="0"></label>
-          </div>
+          <label class="field big"><span>Tips $</span><input type="text" inputmode="decimal" id="fTips" placeholder="Leave blank if none"></label>
           <details class="more" id="more">
-            <summary>Sales, note</summary>
+            <summary>More <span class="muted small" id="moreSum"></span></summary>
             <div class="grid2">
-              <label class="field"><span>Sales $ <em>optional</em></span><input type="text" inputmode="decimal" id="fSales" placeholder="—"></label>
-              <label class="field"><span>Note <em>optional</em></span><input type="text" id="fNote" maxlength="200" placeholder="Big party"></label>
+              <label class="field"><span>Date</span><input type="date" id="fDate" required></label>
+              <label class="field"><span>Hours <em id="hoursHint"></em></span><input type="text" inputmode="decimal" id="fHours" placeholder="6"></label>
             </div>
+            <div class="grid2" id="extraFields">
+              <label class="field"><span>Tipped out $</span><input type="text" inputmode="decimal" id="fTipout" placeholder="0"></label>
+              <label class="field"><span>Sales $</span><input type="text" inputmode="decimal" id="fSales" placeholder="—"></label>
+            </div>
+            <label class="field"><span>Note</span><input type="text" id="fNote" maxlength="200" placeholder="Big party"></label>
           </details>
           <p class="takehome" id="takeLine" aria-live="polite"></p>
           <p class="err" id="formErr" role="alert"></p>
-          <div class="row-btns">
-            <button type="submit" class="btn gold" id="saveBtn">Save shift</button>
-            <button type="button" class="btn ghost" id="cancelEdit" hidden>Cancel edit</button>
-          </div>
+          <button type="submit" class="btn gold btn-big" id="saveBtn">Add shift</button>
+          <button type="button" class="btn ghost" id="cancelEdit" hidden>Cancel edit</button>
         </form>
       </div>
     </section>
@@ -132,29 +129,30 @@
         </div>
         <div class="cal-dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
         <div class="cal-grid" id="calGrid" role="grid" aria-label="Month"></div>
+        <button type="button" class="btn gold btn-big" id="calAdd">Add shift</button>
         <div class="cal-day" id="calDay" hidden></div>
       </div>
     </section>
 
     <section id="history" aria-label="History">
+      <div class="rfilter" id="roleFilter" hidden></div>
       <div class="totals" id="totals"></div>
-      <div class="glass card reveal">
-        <div class="card-head"><h2>Best shifts</h2><span class="hint">by total $/hr</span></div>
+      <details class="glass card fold" id="paceWrap" hidden><summary id="paceLine"></summary><div id="paceMore" class="muted small"></div></details>
+      <div class="glass card rbreak" id="roleBreak" hidden></div>
+      <details class="glass card reveal fold" id="bestWrap">
+        <summary><b>Your best shifts</b> <span id="bestSum" class="muted"></span></summary>
         <ol class="best" id="bestList"></ol>
-      </div>
+      </details>
       <div class="glass card reveal">
         <div class="card-head"><h2>Shifts</h2><span class="hint" id="shiftCount"></span></div>
         <div id="shiftList"></div>
       </div>
       <div class="glass card reveal">
-        <div class="card-head"><h2>Settings &amp; backup</h2><span class="hint">Data stays on this phone</span></div>
-        <label class="field wage-field"><span>Base wage $/hr</span><input type="text" inputmode="decimal" id="fWage" placeholder="16.90"></label>
-        <p class="muted small">Wages = hours × base wage, used in every total. Export a CSV now and then; Import merges one back in and skips duplicates.</p>
-        <div class="row-btns">
-          <button type="button" class="btn" id="exportBtn">Export CSV</button>
-          <label class="btn" for="importFile">Import CSV</label>
-          <input type="file" id="importFile" accept=".csv,text/csv" hidden>
-        </div>
+        <div class="card-head"><h2>Settings</h2><span class="hint">Data stays on this phone</span></div>
+        <div class="field"><span>Roles &amp; hourly wage</span></div>
+        <div id="roleList"></div>
+        <div class="role-row add"><input type="text" id="newRoleName" maxlength="40" placeholder="New role, e.g. Bartender"><span class="usd">$</span><input type="text" inputmode="decimal" id="newRoleWage" placeholder="16.90"><button type="button" class="btn" id="addRole">Add</button></div>
+        <p class="muted small">Each shift saves its role and wage when you log it, so changing or deleting a role never rewrites past shifts.</p>
       </div>
       <footer class="foot">Private: no accounts, no tracking, nothing leaves this phone.</footer>
     </section>

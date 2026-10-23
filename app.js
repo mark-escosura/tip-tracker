@@ -29,8 +29,20 @@
   function uid() { return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   var WAGE_KEY = 'tiptracker.wage', DEFAULT_WAGE = 16.90;
   function getWage() { var w = parseFloat(localStorage.getItem(WAGE_KEY)); return isFinite(w) && w >= 0 && w <= 200 ? w : DEFAULT_WAGE; }
-  var wage = getWage();
-  function wages(s) { return s.hours * wage; }
+  /* Roles replace the single wage setting. Each shift snapshots role + wage when saved, so editing a role never rewrites history. */
+  var ROLES_KEY = 'tiptracker.roles', LASTROLE_KEY = 'tiptracker.lastRole';
+  function okWage(w) { return typeof w === 'number' && isFinite(w) && w >= 0 && w <= 200; }
+  function loadRoles() { try { var a = JSON.parse(localStorage.getItem(ROLES_KEY) || 'null');
+      if (Array.isArray(a)) { a = a.filter(function (r) { return r && typeof r.name === 'string' && r.name.trim() && okWage(r.wage); }); if (a.length) return a; } } catch (e) {}
+    var seed = [{ id: 'r' + Date.now().toString(36), name: 'Server', wage: r2(getWage()) }];   // seeded from the old wage setting
+    localStorage.setItem(ROLES_KEY, JSON.stringify(seed)); return seed; }
+  var roles = loadRoles();
+  function saveRoles() { localStorage.setItem(ROLES_KEY, JSON.stringify(roles)); }
+  function roleByName(n) { n = String(n || '').trim().toLowerCase(); return roles.find(function (r) { return r.name.toLowerCase() === n; }) || null; }
+  function defaultRole() { var id = localStorage.getItem(LASTROLE_KEY); return roles.find(function (r) { return r.id === id; }) || roles[0]; }
+  var wage = defaultRole().wage;   // fallback wage only for records without a snapshot
+  function shiftWage(s) { return okWage(s.wage) ? s.wage : wage; }
+  function wages(s) { return s.hours * shiftWage(s); }
   function take(s) { return wages(s) + (s.tips || 0) - (s.tipout || 0); }          // take-home = wages + tips - tip-out
   /* clock times "HH:MM" (24h). Out <= in means the shift crossed midnight. */
   function okTime(t) { return typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t); }
@@ -39,6 +51,7 @@
     var d = y - x; if (d <= 0) d += 1440; return r2(d / 60); }
   function fmtTime(t) { if (!okTime(t)) return ''; var h = +t.slice(0, 2), m = t.slice(3); return ((h % 12) || 12) + (m === '00' ? '' : ':' + m) + (h < 12 ? 'am' : 'pm'); }
   function clockText(s) { return okTime(s.clockIn) && okTime(s.clockOut) ? fmtTime(s.clockIn) + '–' + fmtTime(s.clockOut) : ''; }
+  function tipped(s) { return typeof s.tips === 'number' && isFinite(s.tips); }   // tips entered (0 counts), blank = no tips that shift
   function netTips(s) { return (s.tips || 0) - (s.tipout || 0); }
 
   /* ---------------- storage ---------------- */
@@ -46,7 +59,8 @@
   /* v1 entries had separate cash/card: sum them into tips (one-time migration) */
   function migrate(s) {
     if (s && s.tips == null && (s.cash != null || s.card != null)) { s.tips = r2((+s.cash || 0) + (+s.card || 0)); }
-    if (s) { delete s.cash; delete s.card; if (s.tips == null) s.tips = 0; s.clockIn = normTime(s.clockIn); s.clockOut = normTime(s.clockOut); }
+    if (s) { delete s.cash; delete s.card; if (s.tips === undefined || s.tips === '') s.tips = null; delete s.tipped; s.clockIn = normTime(s.clockIn); s.clockOut = normTime(s.clockOut);
+      if (!s.role) s.role = roles[0].name; if (typeof s.wage === 'string') s.wage = parseFloat(s.wage); if (!okWage(s.wage)) s.wage = r2(getWage()); }
     return s;
   }
   function load() { try { var raw = localStorage.getItem(KEY) || '[]', a = JSON.parse(raw); if (!Array.isArray(a)) return [];
@@ -63,7 +77,7 @@
       [-7, 'dinner', 6, 55, 60, 600, 11], [-6, 'lunch', 5, 35, 39, 400, 7], [-4, 'dinner', 6.5, 70, 81, 760, 15], [-3, 'dinner', 7, 79, 90, 850, 17],
       [-2, 'breakfast', 6, 64, 49, 560, 11], [-12, 'dinner', 6, 58, 66, 640, 12], [-10, 'lunch', 5, 31, 44, 390, 7], [-9, 'dinner', 7, 82, 85, 830, 16]];
     plan.forEach(function (p, i) { var d = addDays(m, p[0]); if (d > now) return;
-      out.push({ id: 'demo' + i, date: iso(d), shift: p[1], hours: p[2], tips: p[3] + p[4], sales: p[5], tipout: p[6], note: '', demo: true }); });
+      out.push({ id: 'demo' + i, date: iso(d), shift: p[1], hours: p[2], tips: p[3] + p[4], sales: p[5], tipout: p[6], note: '', role: roles[0].name, wage: roles[0].wage, demo: true }); });
     return out;
   }
   function isDemo() { return !LOGGING || shifts.length === 0; }
@@ -72,11 +86,14 @@
   /* ---------------- stats ---------------- */
   function agg(list) {
     var a = { n: list.length, tips: 0, tipout: 0, hours: 0, sales: 0, salesTips: 0 };
-    list.forEach(function (s) { a.tips += s.tips || 0; a.tipout += s.tipout || 0; a.hours += s.hours;
-      if (s.sales > 0) { a.sales += s.sales; a.salesTips += s.tips || 0; } });
-    a.wages = a.hours * wage; a.take = a.wages + a.tips - a.tipout;
+    a.wages = 0; a.wageSet = {};
+    a.tipHours = 0; a.tipN = 0; a.tipNet = 0;
+    list.forEach(function (s) { a.tips += s.tips || 0; a.tipout += s.tipout || 0; a.hours += s.hours; a.wages += wages(s); a.wageSet[shiftWage(s).toFixed(2)] = 1;
+      if (tipped(s)) { a.tipHours += s.hours; a.tipN++; a.tipNet += netTips(s); }
+      if (s.sales > 0 && tipped(s)) { a.sales += s.sales; a.salesTips += s.tips || 0; } });
+    a.take = a.wages + a.tips - a.tipout;
     a.rate = a.hours > 0 ? a.take / a.hours : null;                       // total $/hr
-    a.tipRate = a.hours > 0 ? (a.tips - a.tipout) / a.hours : null;       // tips $/hr (after tip-out)
+    a.tipRate = a.tipHours > 0 ? a.tipNet / a.tipHours : null;   // only shifts with tips entered       // tips $/hr (after tip-out)
     a.tipPct = a.sales > 0 ? a.salesTips / a.sales : null; return a;
   }
   function stats(list) {
@@ -98,7 +115,7 @@
   /* ---------------- quick text parser ---------------- */
   var WD = { sun: 0, sunday: 0, mon: 1, monday: 1, tue: 2, tues: 2, tuesday: 2, wed: 3, weds: 3, wednesday: 3, thu: 4, thur: 4, thurs: 4, thursday: 4, fri: 5, friday: 5, sat: 6, saturday: 6 };
   function parseQuick(text) {
-    var out = { date: null, shift: null, hours: null, clockIn: null, clockOut: null, tips: null, tipParts: [], sales: null, tipout: null, note: '', leftovers: [] };
+    var out = { date: null, shift: null, role: null, hours: null, clockIn: null, clockOut: null, tips: null, tipParts: [], sales: null, tipout: null, note: '', leftovers: [] };
     var raw = String(text || ''); var nm = raw.match(/\bnote[:\s-]+(.+)$/i);
     if (nm) { out.note = nm[1].trim(); raw = raw.slice(0, nm.index); }
     var t = ' ' + raw.toLowerCase() + ' ', today = new Date();
@@ -112,6 +129,9 @@
     t = t.replace(/\b(yesterday|today|tonight|this morning|last|on|and|plus)\b/g, ' ');
     var sm = t.match(/\b(breakfast|bfast|brekkie|morning|lunch|dinner|supper|overnight|graveyard|grave|overnite)\b/);
     if (sm) { var w = sm[1]; out.shift = /^(breakfast|bfast|brekkie|morning)$/.test(w) ? 'breakfast' : w === 'lunch' ? 'lunch' : /^(dinner|supper)$/.test(w) ? 'dinner' : 'overnight'; t = t.replace(sm[0], ' '); }
+    roles.slice().sort(function (a, b) { return b.name.length - a.name.length; }).some(function (r) {
+      var re = new RegExp('(^|[^a-z0-9])' + r.name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=$|[^a-z0-9])');
+      if (re.test(t)) { out.role = r.name; t = t.replace(re, '$1 '); return true; } return false; });
     var rg = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm|a|p)?\s*(?:-|–|—|to|till|til|until)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm|a|p)?\b/);
     if (rg && (rg[2] || rg[3] || rg[5] || rg[6] || /to|til|until/.test(rg[0]) || +rg[1] > 12 || +rg[4] > 12)) {
       var ct = clockRange(+rg[1], +(rg[2] || 0), rg[3], +rg[4], +(rg[5] || 0), rg[6]);
@@ -152,58 +172,22 @@
       if (d <= 960 && (!best || d < best.d)) best = { d: d, x: x, y: y }; }); });
     return best ? [pad(best.x) + ':' + pad(m1), pad(best.y) + ':' + pad(m2)] : null;
   }
-  function quickReady(p) { return p.shift && p.hours > 0 && p.hours <= 24 && p.tips != null && !p.leftovers.length; }
-  function fromParsed(p, date) { return { date: date || p.date || iso(new Date()), shift: p.shift, hours: p.hours, clockIn: p.clockIn, clockOut: p.clockOut, tips: p.tips || 0,
+  function quickReady(p) { return p.shift && p.hours > 0 && p.hours <= 24 && !p.leftovers.length; }
+  function fromParsed(p, date) { return { date: date || p.date || iso(new Date()), shift: p.shift, role: p.role || selRole() || defaultRole().name, hours: p.hours, clockIn: p.clockIn, clockOut: p.clockOut, tips: p.tips != null ? p.tips : null,
     sales: p.sales, tipout: p.tipout || 0, note: p.note || '' }; }
   function previewHTML(p, date) {
     var chip = function (label, val, miss) { return '<span class="chip' + (miss ? ' miss' : '') + '">' + label + (val != null ? ' ' + val : '') + '</span>'; };
     var h = '<div class="chips">' + chip(date ? nice(date) : p.date ? nice(p.date) : nice(iso(new Date())) + ' (today)') +
-      (p.shift ? chip(cap(p.shift)) : chip('shift?', null, true)) + (p.clockIn ? chip(fmtTime(p.clockIn) + '–' + fmtTime(p.clockOut)) : '') + (p.hours ? chip(p.hours + 'h') : chip('hours?', null, true)) +
-      (p.tips != null ? chip('Tips', money(p.tips) + (p.tipParts.length > 1 ? ' (' + p.tipParts.join(' + ') + ')' : '')) : chip('tips?', null, true)) +
+      (p.shift ? chip(cap(p.shift)) : chip('shift?', null, true)) + (p.role ? chip(esc(p.role)) : '') + (p.clockIn ? chip(fmtTime(p.clockIn) + '–' + fmtTime(p.clockOut)) : '') + (p.hours ? chip(p.hours + 'h') : chip('hours?', null, true)) +
+      (p.tips != null ? chip('Tips', money(p.tips) + (p.tipParts.length > 1 ? ' (' + p.tipParts.join(' + ') + ')' : '')) : chip('no tips')) +
       (p.tipout != null ? chip('Tip-out', money(p.tipout)) : '') + (p.sales != null ? chip('Sales', money(p.sales)) : '') +
       (p.note ? chip('Note: ' + esc(p.note)) : '') + '</div>';
-    if (p.tips != null && p.hours > 0) { var w = p.hours * wage, tk = w + p.tips - (p.tipout || 0);
+    if (p.tips != null && p.hours > 0) { var pr = roleByName(p.role) || defaultRole(), w = p.hours * pr.wage, tk = w + p.tips - (p.tipout || 0);
       h += '<div class="sum">Take-home <b>' + money(tk) + '</b> · ' + rate(tk / p.hours) + '<div class="muted small">Wages ' + money(w) + ' + tips ' + money(p.tips) + (p.tipout ? ' − tip-out ' + money(p.tipout) : '') + '</div></div>'; }
     if (p.leftovers.length) h += '<div class="warn">Not sure what ' + p.leftovers.map(function (x) { return '$' + x; }).join(', ') + ' is. Say tips, sales or tipped out.</div>';
     return h;
   }
 
-  /* ---------------- CSV ---------------- */
-  var COLS = ['id', 'date', 'shift', 'hours', 'clockIn', 'clockOut', 'tips', 'sales', 'tipout', 'note'];
-  function csvCell(v) { v = v == null ? '' : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
-  function toCSV(list) { return COLS.join(',') + '\n' + list.map(function (s) { return COLS.map(function (c) { return csvCell(s[c]); }).join(','); }).join('\n') + '\n'; }
-  function parseCSV(text) {
-    var rows = [], row = [], cell = '', q = false; text = text.replace(/^\uFEFF/, '');
-    for (var i = 0; i < text.length; i++) { var c = text[i];
-      if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
-      else if (c === '"') q = true; else if (c === ',') { row.push(cell); cell = ''; }
-      else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
-      else cell += c; }
-    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
-    return rows.filter(function (r) { return r.some(function (x) { return x.trim() !== ''; }); });
-  }
-  function importCSV(text) {
-    var rows = parseCSV(text); if (!rows.length) return { added: 0, skipped: 0, bad: 0 };
-    var head = rows[0].map(function (h) { return h.trim().toLowerCase().replace(/[^a-z]/g, ''); });
-    var ix = {}; COLS.concat(['cash', 'card']).forEach(function (c) { ix[c] = head.indexOf(c.toLowerCase()); });
-    if (ix.date < 0 || ix.shift < 0 || ix.hours < 0) return { error: 'CSV needs date, shift and hours columns' };
-    var ids = {}, sig = {}; var sg = function (s) { return [s.date, s.shift, s.hours, s.tips, s.tipout].join('|'); };
-    shifts.forEach(function (s) { ids[s.id] = 1; sig[sg(s)] = 1; });
-    var res = { added: 0, skipped: 0, bad: 0 };
-    rows.slice(1).forEach(function (r) {
-      var g = function (c) { return ix[c] >= 0 ? (r[ix[c]] || '').trim() : ''; };
-      var date = g('date'), md = date.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-      if (md) date = (md[3].length === 2 ? '20' + md[3] : md[3]) + '-' + pad(+md[1]) + '-' + pad(+md[2]);
-      // old CSVs (cash, card columns) are summed into tips
-      var tips = g('tips') !== '' ? num(g('tips')) : r2((num(g('cash')) || 0) + (num(g('card')) || 0));
-      var s = { id: g('id') || uid(), date: date, shift: g('shift').toLowerCase(), hours: num(g('hours')), tips: tips,
-        sales: num(g('sales')), tipout: num(g('tipout')) || 0, note: g('note'), clockIn: normTime(g('clockIn')), clockOut: normTime(g('clockOut')) };
-      if (!valid(s) || [s.tips, s.tipout].some(isNaN) || (s.sales != null && isNaN(s.sales)) || isNaN(num(g('cash')) || 0) || isNaN(num(g('card')) || 0)) { res.bad++; return; }
-      if (ids[s.id] || sig[sg(s)]) { res.skipped++; return; }
-      ids[s.id] = 1; sig[sg(s)] = 1; shifts.push(s); res.added++;
-    });
-    if (res.added) save(); return res;
-  }
 
   /* ---------------- UI render ---------------- */
   var S;  // current stats
@@ -211,13 +195,21 @@
   var calMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1), calSel = null;
   function shiftRow(s) { var tk = take(s);
     return '<div class="shift" data-id="' + esc(s.id) + '"><div class="main"><div class="t">' + nice(s.date) + ' · ' + cap(s.shift) + (s.demo ? '<span class="demo-tag">DEMO</span>' : '') + '</div>' +
-      '<div class="d">' + (clockText(s) ? clockText(s) + ' · ' : '') + s.hours + 'h · ' + money(wages(s)) + ' wages · ' + money(s.tips) + ' tips' + (s.tipout ? ' · −' + money(s.tipout) + ' tip-out' : '') +
+      '<div class="d">' + (clockText(s) ? clockText(s) + ' · ' : '') + s.hours + 'h · ' + (s.role ? esc(s.role) + ' $' + shiftWage(s).toFixed(2) + ' · ' : '') + money(wages(s)) + ' wages · ' + (tipped(s) ? money(s.tips) + ' tips' : 'no tips') + (s.tipout ? ' · −' + money(s.tipout) + ' tip-out' : '') +
       (s.sales ? ' · ' + money(s.sales) + ' sales' : '') + (s.note ? ' · ' + esc(s.note) : '') + '</div></div>' +
       '<div class="amt"><b>' + money(tk) + '</b><span>' + rate(tk / s.hours) + '</span></div>' +
       (s.demo ? '' : '<button class="icon-btn" data-act="edit" aria-label="Edit shift">✎</button><button class="icon-btn del" data-act="del" aria-label="Delete shift">✕</button>') + '</div>';
   }
+  var roleFilter = '';
+  function roleNames(list) { var seen = {}, out = []; roles.concat(list.map(function (s) { return { name: s.role }; })).forEach(function (r) {
+      if (r.name && !seen[r.name.toLowerCase()]) { seen[r.name.toLowerCase()] = 1; out.push(r.name); } }); return out; }
   function renderAll() {
-    var list = dataset(), demo = isDemo(); S = stats(list);
+    var full = dataset(), demo = isDemo(), names = roleNames(full);
+    if (roleFilter && names.indexOf(roleFilter) < 0) roleFilter = '';
+    var list = roleFilter ? full.filter(function (s) { return s.role === roleFilter; }) : full; S = stats(list);
+    $('#roleFilter').hidden = names.length < 2;
+    $('#roleFilter').innerHTML = ['All roles'].concat(names).map(function (n, i) { var v = i ? n : '';
+      return '<button type="button" class="rchip' + (v === roleFilter ? ' on' : '') + '" data-rf="' + esc(v) + '">' + esc(n) + '</button>'; }).join('');
     $('#demoBadge').hidden = !demo;
     var W = S.week, M = S.month, A = S.all;
     $('#c1Big').textContent = money(W.take);
@@ -237,11 +229,20 @@
     function tcard(k, a, emptyMsg) {
       if (!a.n) return '<div class="glass tcard reveal"><div class="k">' + k + '</div><div class="empty">' + emptyMsg + '</div></div>';
       return '<div class="glass tcard reveal"><div class="k">' + k + '</div><div class="v">' + money(a.take) + '</div>' +
-        '<div class="r"><b>' + rate(a.rate) + '</b> total · tips ' + rate(a.tipRate) + '</div>' +
-        '<div class="s">Wages ' + money(a.wages) + ' (' + r2(a.hours) + 'h × $' + wage.toFixed(2) + ') · Tips ' + money(a.tips) + ' · Tip-out ' + money(a.tipout) +
+        '<div class="r"><b>' + rate(a.rate) + '</b> total' + (a.tipN ? ' · tips ' + rate(a.tipRate) + (a.tipN < a.n ? ' (' + a.tipN + ' tipped shift' + (a.tipN > 1 ? 's' : '') + ')' : '') : ' · no tips logged') + '</div>' +
+        '<div class="s">Wages ' + money(a.wages) + ' (' + r2(a.hours) + 'h' + (Object.keys(a.wageSet).length === 1 ? ' × $' + Object.keys(a.wageSet)[0] : ', mixed rates') + ') · Tips ' + money(a.tips) + ' · Tip-out ' + money(a.tipout) +
         '<br>' + a.n + ' shift' + (a.n > 1 ? 's' : '') + (a.tipPct != null ? ' · tips ' + (a.tipPct * 100).toFixed(1) + '% of sales' : '') + '</div></div>';
     }
     $('#totals').innerHTML = tcard('This week', W, 'No shifts yet this week.') + tcard('This month', M, 'No shifts yet this month.') + tcard('All time', A, 'No shifts yet.');
+    var byRole = names.map(function (n) { return { n: n, a: agg(full.filter(function (s) { return s.role === n; })) }; }).filter(function (x) { return x.a.n; });
+    $('#roleBreak').hidden = !byRole.length;
+    $('#roleBreak').innerHTML = '<div class="k">By role · all time</div>' + byRole.map(function (x) { return '<div class="rb" data-role="' + esc(x.n) + '"><b>' + esc(x.n) + '</b><span>' + r2(x.a.hours) + 'h · ' + money(x.a.take) + ' take-home · ' + rate(x.a.rate) + (x.a.tipN ? ' · tips ' + rate(x.a.tipRate) : ' · no tips') + ' · ' + x.a.n + ' shift' + (x.a.n > 1 ? 's' : '') + '</span></div>'; }).join('');
+    var b0 = S.best[0]; $('#bestSum').textContent = b0 ? '· top $' + b0.rate.toFixed(2) + '/hr on ' + nice(b0.s.date) : '· none yet';
+    var now = new Date(), dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(), dd = now.getDate();
+    $('#paceWrap').hidden = !M.n;
+    if (M.n) { var pace = M.take / dd * dim;
+      $('#paceLine').innerHTML = 'On pace for <b>' + money(pace) + '</b> this month';
+      $('#paceMore').innerHTML = 'So far: ' + money(M.take) + ' in ' + dd + ' of ' + dim + ' days (' + M.n + ' shift' + (M.n > 1 ? 's' : '') + ').<br>If the rest of the month goes like the first ' + dd + ' days, that\'s about ' + money(pace) + '.'; }
     $('#bestList').innerHTML = S.best.length ? S.best.map(function (x) {
       return '<li><div class="who">' + nice(x.s.date) + ' · ' + cap(x.s.shift) + '<div class="sub">' + x.s.hours + 'h · ' + money(take(x.s)) + ' take-home · tips ' + rate(netTips(x.s) / x.s.hours) + '</div></div><div class="rate">$' + x.rate.toFixed(2) + '/hr</div></li>';
     }).join('') : '<li class="empty" style="counter-increment:none">Log a shift to see your best ones.</li>';
@@ -348,42 +349,67 @@
   var editing = null;
   function resetForm() {
     editing = null; $('#form').reset(); $('#fDate').value = iso(new Date());
-    $('#hoursHint').textContent = ''; $('#saveBtn').textContent = 'Save shift'; $('#cancelEdit').hidden = true; $('#formErr').textContent = ''; $('#more').open = false; updateTakeLine();
+    renderRoleChips(); setRole(defaultRole().name); formWage = null; $('#hoursHint').textContent = ''; $('#saveBtn').textContent = 'Add shift'; shiftTouched = false; guessShift(); $('#roleChips').hidden = roles.length < 2; $('#cancelEdit').hidden = true; $('#formErr').textContent = ''; $('#more').open = false; updateTakeLine();
   }
+  /* shift type auto-guessed from clock-in; one tap overrides */
+  var shiftTouched = false;
+  function shiftFor(t) { if (!okTime(t)) return null; var m = +t.slice(0, 2) * 60 + +t.slice(3);
+    return m < 300 ? 'overnight' : m < 630 ? 'breakfast' : m < 900 ? 'lunch' : m < 1260 ? 'dinner' : 'overnight'; }
+  function guessShift() { if (shiftTouched) return; var g = shiftFor(normTime($('#fIn').value)) ||
+      shiftFor(pad(new Date().getHours()) + ':' + pad(new Date().getMinutes()));
+    Array.prototype.forEach.call(document.querySelectorAll('input[name=shift]'), function (r) { r.checked = r.value === g; }); }
+  function moreSummary() { var f = readForm(), bits = [];
+    if (f.date && f.date !== iso(new Date())) bits.push(nice(f.date)); if (f.tipout) bits.push('tipped out ' + money(f.tipout));
+    if (f.sales) bits.push('sales ' + money(f.sales)); if (f.note) bits.push('note'); $('#moreSum').textContent = bits.length ? '· ' + bits.join(' · ') : ''; }
   function readForm() {
     var sh = document.querySelector('input[name=shift]:checked');
-    return { date: $('#fDate').value, shift: sh ? sh.value : null, hours: num($('#fHours').value), clockIn: normTime($('#fIn').value), clockOut: normTime($('#fOut').value), tips: num($('#fTips').value),
+    return { date: $('#fDate').value, shift: sh ? sh.value : null, hours: num($('#fHours').value), role: selRole(), clockIn: normTime($('#fIn').value), clockOut: normTime($('#fOut').value), tips: num($('#fTips').value),
       sales: num($('#fSales').value), tipout: num($('#fTipout').value), note: $('#fNote').value.trim() };
   }
   function fillForm(s) {
     $('#fDate').value = s.date || iso(new Date());
     Array.prototype.forEach.call(document.querySelectorAll('input[name=shift]'), function (r) { r.checked = r.value === s.shift; });
+    setRole(s.role ? s.role : defaultRole().name); formWage = okWage(s.wage) ? s.wage : null;
     $('#fIn').value = s.clockIn || ''; $('#fOut').value = s.clockOut || '';
     $('#fHours').value = s.hours != null ? s.hours : ''; hoursHint(); $('#fTips').value = s.tips != null ? s.tips : '';
     $('#fSales').value = s.sales != null ? s.sales : ''; $('#fTipout').value = s.tipout ? s.tipout : ''; $('#fNote').value = s.note || '';
-    $('#more').open = !!(s.sales != null || s.note); updateTakeLine();
+    shiftTouched = !!s.shift; if (!s.shift) guessShift();
+    $('#more').open = !!(s.sales != null || s.note || s.tipout || (s.hours && !s.clockIn)); moreSummary(); updateTakeLine();
   }
   function validate(f) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(f.date || '')) return 'Pick a date.';
     if (!f.shift) return 'Pick a shift.';
+    if (!f.role) return 'Pick a role.';
     if (!!f.clockIn !== !!f.clockOut) return 'Add both clock in and clock out (or neither).';
+    if (f.hours == null && !f.clockIn) return 'Add your clock in and clock out times.';
     if (!(f.hours > 0) || f.hours > 24) return 'Hours should be between 0 and 24.';
-    if (f.tips == null) return 'Add your tips (0 is fine).';
     if ([f.tips, f.tipout, f.sales].some(function (v) { return v != null && (isNaN(v) || v < 0); })) return 'Amounts should be numbers, 0 or more.';
     return '';
   }
   function hoursHint() { var span = spanHours(normTime($('#fIn').value), normTime($('#fOut').value)), h = num($('#fHours').value);
     $('#hoursHint').textContent = span == null ? '' : h != null && !isNaN(h) && Math.abs(h - span) > 0.004 ? '(' + span + 'h clocked, ' + (h < span ? r2(span - h) + 'h break' : 'override') + ')' : '(from clock)'; }
-  function onClockChange() { var span = spanHours(normTime($('#fIn').value), normTime($('#fOut').value));
+  function onClockChange() { guessShift(); var span = spanHours(normTime($('#fIn').value), normTime($('#fOut').value));
     if (span != null) $('#fHours').value = span; hoursHint(); updateTakeLine(); }
   function updateTakeLine() {
     var f = readForm(), t = f.tipout || 0;
-    if (f.tips == null || isNaN(f.tips) || isNaN(t) || !(f.hours > 0)) { $('#takeLine').innerHTML = ''; return; }
-    var w = f.hours * wage, tk = w + f.tips - t;
-    $('#takeLine').innerHTML = 'Take-home <b>' + money(tk) + '</b> · ' + rate(tk / f.hours) + '<br><span class="muted small">Wages ' + money(w) + ' + tips ' + money(f.tips) + (t ? ' − tip-out ' + money(t) : '') + '</span>';
+    if ((f.tips != null && isNaN(f.tips)) || isNaN(t) || !(f.hours > 0)) { $('#takeLine').innerHTML = ''; return; }
+    var w = f.hours * formRate(f.role), tk = w + (f.tips || 0) - t;
+    $('#takeLine').innerHTML = 'Take-home <b>' + money(tk) + '</b> · ' + rate(tk / f.hours) + '<br><span class="muted small">Wages ' + money(w) + (f.tips != null ? ' + tips ' + money(f.tips) : ' · no tips') + (t ? ' − tip-out ' + money(t) : '') + '</span>';
   }
+  /* role chips in the form */
+  var formWage = null;   // wage snapshot of the shift being edited
+  function renderRoleChips() { var cur = selRole() || defaultRole().name; $('#roleChips').hidden = roles.length < 2;
+    $('#roleChips').innerHTML = roles.map(function (r) { return '<label><input type="radio" name="role" value="' + esc(r.name) + '"' + (r.name === cur ? ' checked' : '') + '><span>' + esc(r.name) + ' <em>$' + r.wage.toFixed(2) + '</em></span></label>'; }).join(''); }
+  function selRole() { var r = document.querySelector('input[name=role]:checked'); return r ? r.value : null; }
+  function setRole(n) { var hit = false; Array.prototype.forEach.call(document.querySelectorAll('input[name=role]'), function (r) { r.checked = r.value === n; hit = hit || r.checked; });
+    if (!hit && n) { $('#roleChips').insertAdjacentHTML('beforeend', '<label class="gone"><input type="radio" name="role" value="' + esc(n) + '" checked><span>' + esc(n) + ' <em>deleted</em></span></label>'); } }
+  function editingRec() { return editing ? shifts.find(function (x) { return x.id === editing; }) : null; }
+  function formRate(name) { var e = editingRec(); if (e && e.role === name && okWage(formWage)) return formWage; var r = roleByName(name); return r ? r.wage : (e && okWage(e.wage) ? e.wage : wage); }
   function commit(f) {
-    var rec = { date: f.date, shift: f.shift, hours: r2(f.hours), clockIn: f.clockIn && f.clockOut ? f.clockIn : null, clockOut: f.clockIn && f.clockOut ? f.clockOut : null, tips: r2(f.tips || 0),
+    var role = roleByName(f.role) || (f.role ? null : defaultRole()), prev = editing ? shifts.find(function (x) { return x.id === editing; }) : null;
+    var rName = role ? role.name : f.role, rWage = prev && prev.role === rName && okWage(prev.wage) ? prev.wage : role ? role.wage : prev && okWage(prev.wage) ? prev.wage : wage;
+    if (role) localStorage.setItem(LASTROLE_KEY, role.id);
+    var rec = { date: f.date, shift: f.shift, hours: r2(f.hours), role: rName, wage: r2(rWage), clockIn: f.clockIn && f.clockOut ? f.clockIn : null, clockOut: f.clockIn && f.clockOut ? f.clockOut : null, tips: f.tips != null && !isNaN(f.tips) ? r2(f.tips) : null,
       sales: f.sales != null && !isNaN(f.sales) ? r2(f.sales) : null, tipout: r2(f.tipout || 0), note: (f.note || '').slice(0, 200) };
     var msg;
     if (editing) { var i = shifts.findIndex(function (s) { return s.id === editing; }); if (i >= 0) { rec.id = editing; rec.createdAt = shifts[i].createdAt; shifts[i] = rec; } msg = 'Updated'; }
@@ -409,27 +435,50 @@
       shifts = shifts.filter(function (x) { return x.id !== id; }); save(); if (editing === id) resetForm(); renderAll(); toast('Deleted'); }
   }
 
+  /* roles editor (Settings) */
+  var rolesRendering = false;
+  function renderRoleSettings() { rolesRendering = true; try {
+    $('#roleList').innerHTML = roles.map(function (r) { return '<div class="role-row" data-id="' + r.id + '"><input type="text" class="rName" maxlength="40" value="' + esc(r.name) + '" aria-label="Role name">' +
+      '<span class="usd">$</span><input type="text" inputmode="decimal" class="rWage" value="' + r.wage.toFixed(2) + '" aria-label="' + esc(r.name) + ' hourly wage"><button type="button" class="btn ghost rDel" aria-label="Delete ' + esc(r.name) + '"' + (roles.length < 2 ? ' disabled' : '') + '>✕</button></div>'; }).join(''); } finally { rolesRendering = false; } }
+  function rolesChanged(msg) { saveRoles(); wage = defaultRole().wage; var cur = selRole(); renderRoleSettings(); renderRoleChips(); if (cur) setRole(roleByName(cur) ? roleByName(cur).name : cur); renderAll(); updateTakeLine(); if (msg) toast(msg); }
+  function bindRoles() {
+    $('#roleList').addEventListener('change', function (e) { if (rolesRendering) return; var row = e.target.closest('.role-row'); if (!row) return; var r = roles.find(function (x) { return x.id === row.getAttribute('data-id'); }); if (!r) return;
+      if (e.target.classList.contains('rName')) { var n = e.target.value.trim().slice(0, 40), dup = roleByName(n);
+        if (!n || (dup && dup !== r)) { e.target.value = r.name; toast(n ? 'You already have a role called ' + n : 'Role needs a name'); return; }
+        r.name = n; rolesChanged('Renamed to ' + n + ' (past shifts keep their saved name)'); }
+      else if (e.target.classList.contains('rWage')) { var v = num(e.target.value);
+        if (v == null || isNaN(v) || v < 0 || v > 200) { e.target.value = r.wage.toFixed(2); toast('Wage should be between $0 and $200'); return; }
+        r.wage = r2(v); rolesChanged(r.name + ' set to $' + r.wage.toFixed(2) + '/hr for new shifts'); } });
+    $('#roleList').addEventListener('click', function (e) { if (!e.target.classList.contains('rDel') || roles.length < 2) return; var id = e.target.closest('.role-row').getAttribute('data-id');
+      var r = roles.find(function (x) { return x.id === id; }); if (!r || !confirm('Delete role ' + r.name + '? Past shifts keep their saved role and wage.')) return;
+      roles = roles.filter(function (x) { return x.id !== id; }); rolesChanged('Deleted ' + r.name); });
+    $('#addRole').addEventListener('click', function () { var n = $('#newRoleName').value.trim().slice(0, 40), v = num($('#newRoleWage').value);
+      if (!n) { toast('Give the role a name'); return; } if (roleByName(n)) { toast('You already have ' + n); return; }
+      if (v == null || isNaN(v) || v < 0 || v > 200) { toast('Wage should be between $0 and $200'); return; }
+      roles.push({ id: uid(), name: n, wage: r2(v) }); $('#newRoleName').value = ''; $('#newRoleWage').value = ''; rolesChanged('Added ' + n + ' $' + r2(v).toFixed(2) + '/hr'); });
+    $('#roleFilter').addEventListener('click', function (e) { var b = e.target.closest('[data-rf]'); if (!b) return; roleFilter = b.getAttribute('data-rf'); renderAll(); });
+    $('#roleChips').addEventListener('change', updateTakeLine);
+  }
   /* Prefill from a scheduled shift: ?log=YYYY-MM-DD&shift=dinner&in=16:00&out=23:00 (e.g. a link the bot sends) */
   function prefillFromSchedule() {
     if (!qs.has('log') && !qs.has('in')) return false;
-    var d = qs.get('log'), sh = qs.get('shift'), ci = normTime(qs.get('in')), co = normTime(qs.get('out'));
-    fillForm({ date: /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : iso(new Date()), shift: SHIFTS.indexOf(sh) >= 0 ? sh : null,
+    var d = qs.get('log'), sh = qs.get('shift'), rl = roleByName(qs.get('role')), ci = normTime(qs.get('in')), co = normTime(qs.get('out'));
+    fillForm({ date: /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : iso(new Date()), shift: SHIFTS.indexOf(sh) >= 0 ? sh : null, role: rl ? rl.name : null,
       clockIn: ci && co ? ci : null, clockOut: ci && co ? co : null, hours: ci && co ? spanHours(ci, co) : null, tips: null, tipout: 0 });
     return true;
   }
   function bindUI() {
     resetForm(); bindCalendar();
-    $('#fWage').value = wage.toFixed(2);
-    $('#fWage').addEventListener('change', function () { var v = num(this.value);
-      if (v == null || isNaN(v) || v < 0 || v > 200) { this.value = wage.toFixed(2); toast('Wage should be between $0 and $200'); return; }
-      wage = r2(v); localStorage.setItem(WAGE_KEY, String(wage)); this.value = wage.toFixed(2); renderAll(); updateTakeLine(); toast('Base wage set to $' + wage.toFixed(2) + '/hr'); });
+    renderRoleSettings(); bindRoles();
     $('#fIn').addEventListener('change', onClockChange); $('#fOut').addEventListener('change', onClockChange);
     $('#fIn').addEventListener('input', onClockChange); $('#fOut').addEventListener('input', onClockChange);
     $('#fHours').addEventListener('input', hoursHint);
-    $('#form').addEventListener('input', updateTakeLine);
+    $('#form').addEventListener('input', updateTakeLine); $('#form').addEventListener('input', moreSummary);
+    Array.prototype.forEach.call(document.querySelectorAll('input[name=shift]'), function (r) { r.addEventListener('change', function () { shiftTouched = true; }); });
+    $('#calAdd').addEventListener('click', function () { resetForm(); var d = typeof calSel === 'string' && calSel ? calSel : iso(new Date()); $('#fDate').value = d; moreSummary(); goTo('#log', function () { $('#fIn').focus({ preventScroll: true }); }); });
     $('#form').addEventListener('change', updateTakeLine);
     $('#form').addEventListener('submit', function (e) { e.preventDefault(); if (!LOGGING) return;
-      var f = readForm(), err = validate(f); $('#formErr').textContent = err; if (!err) commit(f); });
+      var f = readForm(), err = validate(f); $('#formErr').textContent = err; if (/Hours|Pick a date|numbers/.test(err)) $('#more').open = true; if (!err) commit(f); });
     $('#cancelEdit').addEventListener('click', resetForm);
     $('#quick').addEventListener('input', renderPreview);
     $('#quick').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); if (!$('#quickSave').disabled) $('#quickSave').click(); } });
@@ -442,18 +491,6 @@
       $('#quick').value = ''; renderPreview(); $('#fHours').focus(); });
     $('#shiftList').addEventListener('click', onShiftAction);
     $('#fab').addEventListener('click', function () { goTo('#log', function () { if (LOGGING) $('#quick').focus({ preventScroll: true }); }); });
-    $('#exportBtn').addEventListener('click', function () {
-      if (!shifts.length) { toast('Nothing to export yet'); return; }
-      var blob = new Blob([toCSV(shifts)], { type: 'text/csv' }); var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = 'tips-' + iso(new Date()) + '.csv'; document.body.appendChild(a); a.click();
-      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000); toast('Exported ' + shifts.length + ' shifts');
-    });
-    $('#importFile').addEventListener('change', function (e) {
-      var f = e.target.files[0]; if (!f) return; var rd = new FileReader();
-      rd.onload = function () { var r = importCSV(String(rd.result)); e.target.value = '';
-        if (r.error) { toast(r.error); return; } renderAll(); toast('Imported ' + r.added + (r.skipped ? ' · skipped ' + r.skipped + ' duplicate' + (r.skipped > 1 ? 's' : '') : '') + (r.bad ? ' · ' + r.bad + ' unreadable' : '')); };
-      rd.readAsText(f);
-    });
   }
 
   /* ---------------- scroll + 3D ---------------- */
@@ -562,6 +599,6 @@
     renderAll();
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function () {});
   }
-  window.__ttTest = { parseQuick: parseQuick, toCSV: toCSV, parseCSV: parseCSV, wage: function () { return wage; } };
+  window.__ttTest = { parseQuick: parseQuick, wage: function () { return wage; }, roles: function () { return roles; } };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

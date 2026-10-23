@@ -189,3 +189,17 @@ input[type=date]{color-scheme:dark}
 .wage-field{max-width:200px;margin-bottom:8px}
 
 input[type=time]{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:14px;padding:13px 14px;font-size:17px;outline:none;-webkit-appearance:none;appearance:none;min-height:50px;color-scheme:dark}
+
+.role-row{display:flex;gap:8px;align-items:center;margin:0 0 8px}.role-row input{flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:12px;padding:11px 12px;font-size:16px;color:inherit}
+.role-row .rWage,.role-row #newRoleWage{flex:0 0 78px}.role-row .usd{opacity:.6}.role-row .btn{padding:10px 14px;min-height:0}
+.seg.roles{margin-bottom:10px}.seg.roles em{font-style:normal;opacity:.65;font-size:.85em}.seg.roles .gone{opacity:.6}
+.rfilter{display:flex;gap:8px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px}.rchip{flex:none;border:1px solid var(--line);background:rgba(255,255,255,.05);color:inherit;border-radius:999px;padding:8px 14px;font-size:14px}
+.rchip.on{background:var(--gold,#e8b64c);color:#111;border-color:transparent}
+.rbreak .k{font-size:13px;opacity:.7;margin-bottom:8px}.rbreak .rb{display:flex;flex-direction:column;padding:8px 0;border-top:1px solid var(--line)}.rbreak .rb span{font-size:14px;opacity:.8}
+.rTipsL{display:flex;align-items:center;gap:4px;font-size:13px;opacity:.85;flex:none}.rTipsL input{flex:none;width:18px;height:18px;padding:0}
+
+.btn-big{width:100%;min-height:56px;font-size:18px;margin-top:6px}
+.field.big input{font-size:22px;min-height:58px}
+details.fold>summary{cursor:pointer;list-style:none;padding:2px 0}details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::after{content:' ›';opacity:.5}details.fold[open]>summary::after{content:' ˅'}
+details.fold[open]>summary{margin-bottom:10px}#calAdd{margin-top:12px}
