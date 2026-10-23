@@ -1,186 +1,194 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#07080b">
-<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0F1115">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Tips">
-<meta name="description" content="Private tip tracker. Your shifts stay on your phone.">
+<meta name="apple-mobile-web-app-title" content="Server Life">
+<meta name="description" content="Server Life tip tracker. Your shifts stay on your phone.">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
-<title>Tip Tracker</title>
+<title>Server Life · Tip Tracker</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div id="stage" aria-hidden="true">
-  <canvas id="gl"></canvas>
-  <div id="fallback" hidden>
-    <div class="fb-scene">
-      <div class="fb-jar"><div class="fb-fill"></div><div class="fb-glass"></div><span class="fb-label">TIPS</span></div>
-      <div class="fb-bars"></div>
-    </div>
+<header class="hdr">
+  <div class="logo">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 23h22M7 23a9 9 0 0 1 18 0M16 11V9m-2 0h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <div><b>Server Life</b><span>Tip Tracker</span></div>
   </div>
-  <div class="vignette"></div>
-</div>
-
-<header class="topbar">
-  <div class="brand"><span class="brand-dot"></span>Tip Tracker</div>
-  <span id="demoBadge" class="badge" hidden>Demo data</span>
+  <button class="ibtn" id="hdrCal" aria-label="Calendar"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></button>
+  <label class="sr" for="monthPick">Month</label>
+  <select id="monthPick" class="mpick"></select>
+  <button class="ibtn" id="hdrSet" aria-label="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>
 </header>
 
 <main id="main">
-  <section id="hero" aria-label="Dashboard">
-    <div class="chapters">
-      <article class="chapter" id="ch1">
-        <p class="kicker">This week</p>
-        <h1 class="big" id="c1Big">—</h1>
-        <p class="line" id="c1Line"></p>
-        <p class="line muted" id="c1Split"></p>
-      </article>
-      <article class="chapter" id="ch2">
-        <p class="kicker">Tip jar</p>
-        <h2 class="mid" id="c2Big">—</h2>
-        <p class="line" id="c2Line"></p>
-      </article>
-      <article class="chapter" id="ch3">
-        <p class="kicker">Day by day</p>
-        <h2 class="mid" id="c3Big">—</h2>
-        <p class="line" id="c3Line"></p>
-      </article>
-      <article class="chapter" id="ch4">
-        <p class="kicker">Best shift</p>
-        <h2 class="mid" id="c4Big">—</h2>
-        <p class="line" id="c4Line"></p>
-        <p class="line muted" id="c4All"></p>
-      </article>
+  <div class="banner" id="logBanner" hidden><button type="button" id="bannerText"></button><button type="button" id="bannerX" aria-label="Not now">✕</button></div>
+
+  <!-- DASHBOARD -->
+  <section class="screen" id="s-dashboard" data-title="Dashboard">
+    <h1>Dashboard</h1><p class="sub" id="dRange"></p>
+    <div id="dEmpty" class="card empty" hidden>
+      <p class="big">No shifts this month yet</p><p class="muted">Log a shift and your hourly rate, cash vs card and projection show up here.</p>
+      <button class="btn primary" data-go="log">Log a shift</button>
     </div>
-    <div class="rail"><div class="rail-fill" id="railFill"></div></div>
-    <div class="cue" id="cue">Scroll<span class="cue-arrow"></span></div>
+    <div id="dBody">
+      <div class="card rate-card">
+        <div class="rc-l">
+          <p class="lbl">Effective hourly rate <span class="info" title="Take-home (wages + tips − tip-out) ÷ hours">ⓘ</span></p>
+          <p class="money xl" id="dRate">—</p>
+          <p class="delta" id="dRateDelta"></p>
+        </div>
+        <div class="rc-r" id="dChart"></div>
+      </div>
+      <div class="row2">
+        <div class="card">
+          <p class="lbl">Cash vs card</p>
+          <div class="donut-wrap"><div id="dDonut"></div><div class="legend" id="dLegend"></div></div>
+          <p class="muted xs" id="dUnknown"></p>
+        </div>
+        <div class="card best" id="dBest"></div>
+      </div>
+      <p class="lbl sec">Averages · this month</p>
+      <div class="card avgs" id="dAvgs"></div>
+      <div class="card proj">
+        <p class="lbl">Simple month projection</p>
+        <div class="proj-row"><div class="proj-ic"><svg viewBox="0 0 24 24"><path d="M4 18l5-5 4 3 7-8M15 8h5v5"/></svg></div>
+          <div class="proj-t"><p class="muted s">Projected monthly earnings</p><p class="money l" id="dProj">—</p><p class="muted xs" id="dProjHow"></p></div>
+          <div class="bars" id="dBars"></div></div>
+      </div>
+      <div class="card next" id="dNext" hidden></div>
+    </div>
+    <button class="btn primary wide" data-go="log" id="dLog">+ Log shift</button>
   </section>
 
-  <div id="after">
-    <section id="log" aria-label="Log a shift">
-      <div class="glass card log-card">
-        <div class="card-head"><h2>Log a shift</h2><span class="hint" id="logHint">Under 10 seconds</span></div>
-        <div class="banner" id="logBanner" hidden><button type="button" id="bannerText"></button><button type="button" id="bannerX" aria-label="Not now">✕</button></div>
-        <div id="logLocked" class="locked" hidden>Logging turns on in the next update. This build is the motion preview.</div>
-
-        <label class="sr" for="quick">Quick entry</label>
-        <div class="quick-wrap">
-          <input id="quick" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"
-                 placeholder="4pm-11 dinner, 73 tips, tipped out 12">
-        </div>
-        <div id="quickPreview" class="preview" aria-live="polite" hidden></div>
-        <div class="row-btns" id="quickBtns" hidden>
-          <button type="button" class="btn gold" id="quickSave">Save shift</button>
-          <button type="button" class="btn ghost" id="quickToForm">Edit in form</button>
-        </div>
-
-        <div class="divider"><span>or fill it in</span></div>
-
-        <form id="form" novalidate>
-          <div class="seg roles" id="roleChips" role="radiogroup" aria-label="Role"></div>
-          <div class="grid2">
-            <label class="field"><span>Clock in</span><input type="time" id="fIn"></label>
-            <label class="field"><span>Clock out</span><input type="time" id="fOut"></label>
-          </div>
-          <div class="seg" role="radiogroup" aria-label="Shift">
-            <label><input type="radio" name="shift" value="breakfast"><span>Breakfast</span></label>
-            <label><input type="radio" name="shift" value="lunch"><span>Lunch</span></label>
-            <label><input type="radio" name="shift" value="dinner"><span>Dinner</span></label>
-            <label><input type="radio" name="shift" value="overnight"><span>Overnight</span></label>
-          </div>
-          <label class="field big"><span>Tips $</span><input type="text" inputmode="decimal" id="fTips" placeholder="Leave blank if none"></label>
-          <details class="more" id="more">
-            <summary>More <span class="muted small" id="moreSum"></span></summary>
-            <div class="grid2">
-              <label class="field"><span>Date</span><input type="date" id="fDate" required></label>
-              <label class="field"><span>Hours <em id="hoursHint"></em></span><input type="text" inputmode="decimal" id="fHours" placeholder="6"></label>
-            </div>
-            <div class="grid2" id="extraFields">
-              <label class="field"><span>Tipped out $</span><input type="text" inputmode="decimal" id="fTipout" placeholder="0"></label>
-              <label class="field"><span>Sales $</span><input type="text" inputmode="decimal" id="fSales" placeholder="—"></label>
-            </div>
-            <label class="field"><span>Note</span><input type="text" id="fNote" maxlength="200" placeholder="Big party"></label>
-          </details>
-          <p class="takehome" id="takeLine" aria-live="polite"></p>
-          <p class="err" id="formErr" role="alert"></p>
-          <button type="submit" class="btn gold btn-big" id="saveBtn">Add shift</button>
-          <button type="button" class="btn ghost" id="cancelEdit" hidden>Cancel edit</button>
-        </form>
-      </div>
-    </section>
-
-    <section id="calendar" aria-label="Calendar">
-      <div class="glass card cal-card">
-        <div class="cal-head">
-          <button type="button" class="icon-btn cal-nav" id="calPrev" aria-label="Previous month">&#8249;</button>
-          <div class="cal-title">
-            <p class="kicker" id="calMonth"></p>
-            <div class="cal-total" id="calTotal"></div>
-            <div class="cal-sub" id="calSub"></div>
-          </div>
-          <button type="button" class="icon-btn cal-nav" id="calNext" aria-label="Next month">&#8250;</button>
-        </div>
-        <div class="cal-dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
-        <div class="cal-grid" id="calGrid" role="grid" aria-label="Month"></div>
-        <button type="button" class="btn gold btn-big" id="calAdd">Add shift</button>
+  <!-- SHIFTS -->
+  <section class="screen" id="s-shifts" data-title="Shifts" hidden>
+    <div class="h1row"><h1>Shifts</h1><button class="btn primary sm" data-go="log">+ Log</button></div>
+    <div class="segtabs" id="shiftsSeg"><button data-v="list" class="on">History</button><button data-v="cal">Calendar</button></div>
+    <div id="vList">
+      <div class="card totals" id="hTotals"></div>
+      <div class="rfilter" id="roleFilter" hidden></div>
+      <div id="hList"></div>
+    </div>
+    <div id="vCal" hidden>
+      <div class="card">
+        <div class="calhead"><button class="ibtn" id="calPrev" aria-label="Previous month">‹</button><div><b id="calTitle"></b><span class="muted s" id="calSub"></span></div><button class="ibtn" id="calNext" aria-label="Next month">›</button></div>
+        <div class="dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+        <div class="calgrid" id="calGrid"></div>
+        <p class="muted xs legend2"><i class="lg-l"></i>logged <i class="lg-s"></i>scheduled</p>
+        <button class="btn primary wide" id="calAdd">Add scheduled shift</button>
         <form class="sched-form" id="schedForm" hidden novalidate>
           <h3 id="schedTitle">Add a scheduled shift</h3>
-          <label class="field"><span>Date</span><input type="date" id="sDate" required></label>
-          <div class="seg roles" id="sRoles" role="radiogroup" aria-label="Role"></div>
-          <div class="grid2">
-            <label class="field"><span>Start</span><input type="time" id="sStart"></label>
-            <label class="field"><span>End</span><input type="time" id="sEnd"></label>
-          </div>
-          <p class="muted small" id="sHint"></p>
-          <p class="err" id="sErr" role="alert"></p>
-          <div class="row-btns"><button type="submit" class="btn gold" id="sSave">Add to schedule</button><button type="button" class="btn ghost" id="sCancel">Cancel</button><button type="button" class="btn ghost del" id="sDel" hidden>Delete</button></div>
+          <label class="field"><span>Date</span><input type="date" id="sDate"></label>
+          <div class="chips" id="sRoles" role="radiogroup" aria-label="Role"></div>
+          <div class="grid2"><label class="field"><span>Start</span><input type="time" id="sStart"></label><label class="field"><span>End</span><input type="time" id="sEnd"></label></div>
+          <p class="muted s" id="sHint"></p><p class="err" id="sErr" role="alert"></p>
+          <div class="btnrow"><button type="submit" class="btn primary" id="sSave">Add to schedule</button><button type="button" class="btn ghost" id="sCancel">Cancel</button><button type="button" class="btn danger" id="sDel" hidden>Delete</button></div>
         </form>
-        <button type="button" class="btn ghost" id="icsBtn" hidden>Add to iPhone Calendar</button>
-        <div class="cal-day" id="calDay" hidden></div>
+        <button class="btn ghost wide" id="icsBtn" hidden>Add to iPhone Calendar</button>
+        <div id="calDay"></div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section id="history" aria-label="History">
-      <div class="rfilter" id="roleFilter" hidden></div>
-      <div class="totals" id="totals"></div>
-      <details class="glass card fold" id="paceWrap" hidden><summary id="paceLine"></summary><div id="paceMore" class="muted small"></div></details>
-      <div class="glass card rbreak" id="roleBreak" hidden></div>
-      <details class="glass card reveal fold" id="bestWrap">
-        <summary><b>Your best shifts</b> <span id="bestSum" class="muted"></span></summary>
-        <ol class="best" id="bestList"></ol>
-        <p class="k small muted">Average take-home by day and shift ($/hr · shifts)</p>
-        <div id="dayGrid" class="dgrid-wrap"></div>
+  <!-- LOG SHIFT -->
+  <section class="screen" id="s-log" data-title="Log Shift" hidden>
+    <div class="h1row"><h1 id="logTitle">Log shift</h1><button class="btn ghost sm" id="logBack">Close</button></div>
+    <form id="form" class="card" novalidate>
+      <div class="chips" id="roleChips" role="radiogroup" aria-label="Role"></div>
+      <div class="grid2"><label class="field"><span>Clock in</span><input type="time" id="fIn"></label><label class="field"><span>Clock out</span><input type="time" id="fOut"></label></div>
+      <div class="seg" role="radiogroup" aria-label="Shift">
+        <label><input type="radio" name="shift" value="breakfast"><span>Breakfast</span></label>
+        <label><input type="radio" name="shift" value="lunch"><span>Lunch</span></label>
+        <label><input type="radio" name="shift" value="dinner"><span>Dinner</span></label>
+        <label><input type="radio" name="shift" value="overnight"><span>Overnight</span></label>
+      </div>
+      <div class="grid2">
+        <label class="field big"><span>Cash tips $</span><input type="text" inputmode="decimal" id="fCash" placeholder="0" autocomplete="off"></label>
+        <label class="field big"><span>Card tips $</span><input type="text" inputmode="decimal" id="fCard" placeholder="0" autocomplete="off"></label>
+      </div>
+      <p class="muted xs" id="legacyNote" hidden></p>
+      <details id="more"><summary>More <span class="muted s" id="moreSum"></span></summary>
+        <div class="grid2"><label class="field"><span>Date</span><input type="date" id="fDate"></label><label class="field"><span>Hours <em id="hoursHint"></em></span><input type="text" inputmode="decimal" id="fHours" placeholder="6"></label></div>
+        <div class="grid2"><label class="field"><span>Tipped out $</span><input type="text" inputmode="decimal" id="fTipout" placeholder="0"></label><label class="field"><span>Sales $</span><input type="text" inputmode="decimal" id="fSales" placeholder="—"></label></div>
+        <label class="field"><span>Note</span><input type="text" id="fNote" maxlength="200" placeholder="Big party"></label>
       </details>
-      <div class="glass card reveal">
-        <div class="card-head"><h2>Shifts</h2><span class="hint" id="shiftCount"></span></div>
-        <div id="shiftList"></div>
+      <p class="take" id="takeLine" aria-live="polite"></p>
+      <p class="err" id="formErr" role="alert"></p>
+      <button type="submit" class="btn primary wide big" id="saveBtn">Add shift</button>
+      <button type="button" class="btn ghost wide" id="cancelEdit" hidden>Cancel edit</button>
+    </form>
+  </section>
+
+  <!-- TIPS -->
+  <section class="screen" id="s-tips" data-title="Tips" hidden>
+    <h1>Tips</h1><p class="sub" id="tRange"></p>
+    <div id="tEmpty" class="card empty" hidden><p class="big">No tips logged this month</p><p class="muted">Cash and card tips you log show up here.</p></div>
+    <div id="tBody">
+      <div class="card"><div class="kpis" id="tKpis"></div></div>
+      <div class="card"><p class="lbl">Tips by day</p><div id="tDays"></div></div>
+      <div class="card"><p class="lbl">Average take-home by day and shift</p><div id="dayGrid" class="gridwrap"></div></div>
+    </div>
+  </section>
+
+  <!-- REPORTS -->
+  <section class="screen" id="s-reports" data-title="Reports" hidden>
+    <h1>Reports</h1>
+    <div class="segtabs" id="repSeg"><button data-v="week" class="on">Weekly</button><button data-v="stats">Stats</button><button data-v="goals">Goals</button></div>
+    <div id="rWeek">
+      <div class="card"><div class="calhead"><button class="ibtn" id="wkPrev" aria-label="Previous week">‹</button><div><b id="wkTitle"></b><span class="muted s" id="wkSub"></span></div><button class="ibtn" id="wkNext" aria-label="Next week">›</button></div>
+        <div class="kpis" id="wkKpis"></div><div id="wkDays"></div></div>
+    </div>
+    <div id="rStats" hidden>
+      <div class="card"><p class="lbl">All time</p><div class="kpis" id="stAll"></div></div>
+      <div class="card" id="stRoles"></div>
+      <div class="card"><p class="lbl">Best shifts</p><ol class="bestlist" id="stBest"></ol></div>
+    </div>
+    <div id="rGoals" hidden>
+      <div class="card">
+        <p class="lbl">Goals (take-home)</p>
+        <div class="grid2"><label class="field"><span>Weekly goal $</span><input type="text" inputmode="decimal" id="gWeek" placeholder="Not set"></label><label class="field"><span>Monthly goal $</span><input type="text" inputmode="decimal" id="gMonth" placeholder="Not set"></label></div>
+        <div id="goalBars"></div>
       </div>
-      <div class="glass card reveal">
-        <div class="card-head"><h2>Settings</h2><span class="hint">Data stays on this phone</span></div>
-        <div class="field"><span>Roles &amp; hourly wage</span></div>
-        <div id="roleList"></div>
-        <div class="role-row add"><input type="text" id="newRoleName" maxlength="40" placeholder="New role, e.g. Bartender"><span class="usd">$</span><input type="text" inputmode="decimal" id="newRoleWage" placeholder="16.90"><button type="button" class="btn" id="addRole">Add</button></div>
-        <p class="muted small">Each shift saves its role and wage when you log it, so changing or deleting a role never rewrites past shifts.</p>
-      </div>
-      <footer class="foot">Private: no accounts, no tracking, nothing leaves this phone.</footer>
-    </section>
-  </div>
+    </div>
+    <button class="btn ghost wide" id="repCsv">Export CSV</button>
+    <button class="btn ghost wide" data-go="settings">Settings</button>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="screen" id="s-settings" data-title="Settings" hidden>
+    <div class="h1row"><h1>Settings</h1><button class="btn ghost sm" data-go="dashboard">Done</button></div>
+    <div class="card">
+      <div class="setrow"><span>Dark mode</span><label class="switch"><input type="checkbox" id="darkToggle" checked><i></i></label></div>
+    </div>
+    <div class="card">
+      <p class="lbl">Roles &amp; hourly wage</p>
+      <div id="roleList"></div>
+      <div class="role-row add"><input type="text" id="newRoleName" maxlength="40" placeholder="New role, e.g. Bartender"><span>$</span><input type="text" inputmode="decimal" id="newRoleWage" placeholder="16.90"><button type="button" class="btn sm" id="addRole">Add</button></div>
+      <p class="muted xs">Each shift saves its role and wage when you log it, so changing a wage never rewrites past shifts.</p>
+    </div>
+    <div class="card">
+      <p class="lbl">Your data</p>
+      <button class="btn primary wide" id="csvBtn">Export CSV</button>
+      <p class="muted xs">Everything stays on this phone. No accounts, no bank, nothing shared.</p>
+    </div>
+  </section>
 </main>
 
-<button class="fab" id="fab" type="button" aria-label="Log a shift">+ Log</button>
+<nav class="tabbar" id="tabbar" aria-label="Main">
+  <button data-tab="dashboard" class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>Dashboard</span></button>
+  <button data-tab="shifts"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Shifts</span></button>
+  <button data-tab="tips"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.2c-.5-1-1.6-1.5-2.8-1.5-1.6 0-2.8.8-2.8 2.1 0 3 5.8 1.5 5.8 4.4 0 1.3-1.3 2.1-3 2.1-1.3 0-2.5-.6-3-1.6M12 6v1.7M12 16.3V18"/></svg><span>Tips</span></button>
+  <button data-tab="reports"><svg viewBox="0 0 24 24"><path d="M6 20v-6M12 20V9M18 20V4"/></svg><span>Reports</span></button>
+</nav>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
-<script src="vendor/gsap.min.js"></script>
-<script src="vendor/ScrollTrigger.min.js"></script>
-<script src="vendor/lenis.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

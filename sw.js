@@ -1,7 +1,6 @@
-/* Tip Tracker service worker: full offline cache. Bump VERSION when files change. */
-var VERSION = 'tips-v10';
-var ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'js/scene3d.js', 'vendor/gsap.min.js', 'vendor/ScrollTrigger.min.js', 'vendor/lenis.min.js',
-  'manifest.json', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-512-maskable.png'];
+/* Server Life service worker: full offline cache. Bump VERSION when files change. */
+var VERSION = 'serverlife-v11';
+var ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.json', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-512-maskable.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(VERSION).then(function (c) { return c.addAll(ASSETS); }).then(function () { return self.skipWaiting(); }));
 });
