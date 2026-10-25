@@ -136,7 +136,7 @@
     if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(function () { return true; }, function () { return fb(); }); return Promise.resolve(fb()); }
   function renderDashboard() {
     var now = new Date(), t = iso(now), has = shifts.length > 0;
-    $('#dEmpty').hidden = has; $('#dBody').hidden = !has; if (!has) return;
+    $('#dEmpty').hidden = has; $('#dBody').hidden = !has; $('#dLog').hidden = !has; if (!has) return;
     /* rate: last 7 days vs the 7 before */
     var L7 = agg(inRange(iso(addDays(now, -6)), t)), P7 = agg(inRange(iso(addDays(now, -13)), iso(addDays(now, -7))));
     $('#dRate').textContent = L7.rate != null ? L7.rate.toFixed(2) : '—';
@@ -190,6 +190,8 @@
     $('#roleFilter').innerHTML = ['All roles'].concat(names).map(function (n, i) { var v = i ? n : ''; return '<button type="button" class="rchip' + (v === roleFilter ? ' on' : '') + '" data-rf="' + esc(v) + '">' + esc(n) + '</button>'; }).join('');
     var list = shifts.filter(function (s) { return !roleFilter || s.role === roleFilter; }), A = agg(list);
     $('#hTotals').innerHTML = '<div><p class="v money">' + money0(A.take) + '</p><p class="k">Take-home</p></div><div><p class="v">' + r2(A.hours) + 'h</p><p class="k">' + A.n + ' shift' + (A.n === 1 ? '' : 's') + '</p></div><div><p class="v">' + rate(A.rate).replace('/hr', '') + '</p><p class="k">per hour</p></div>';
+    $('#sEmpty').hidden = !!shifts.length; $('#hTotals').hidden = !shifts.length;
+    if (!shifts.length) { $('#hList').innerHTML = ''; return; }
     if (!list.length) { $('#hList').innerHTML = '<div class="card empty"><p class="big">No shifts yet</p><p class="muted">Tap “+ Log” after your next shift.</p></div>'; return; }
     var sorted = list.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : SHIFTS.indexOf(b.shift) - SHIFTS.indexOf(a.shift); }), groups = [], gi = {};
     sorted.forEach(function (s) { var k = iso(monday(fromIso(s.date))); if (!(k in gi)) { gi[k] = groups.length; groups.push({ k: k, items: [] }); } groups[gi[k]].items.push(s); });
@@ -255,6 +257,7 @@
   function openFromSched(x) { resetForm(); fillForm({ date: x.date, shift: x.shift, role: x.role, clockIn: x.start, clockOut: x.end, hours: spanHours(x.start, x.end) }); pendingSched = x.id; go('log'); setTimeout(function () { $('#fCash').focus(); }, 60); }
 
   /* ---------- tips ---------- */
+  function renderInsightsEmpty() { var has = !!shifts.length; $('#iEmpty').hidden = has; $$('#s-insights > *').forEach(function (el) { if (el.id !== 'iEmpty' && !el.classList.contains('h1row')) { if (!has) { if (!el.hasAttribute('data-eh')) { el.setAttribute('data-eh', el.hidden ? '1' : '0'); } el.hidden = true; } else if (el.hasAttribute('data-eh')) { el.hidden = el.getAttribute('data-eh') === '1'; el.removeAttribute('data-eh'); } } }); $('#monthPick').hidden = !has; }
   function renderTips() { var R = monthRange(period), list = inMonth(period), A = agg(list);
     $('#tRange').textContent = rangeText(R); $('#tEmpty').hidden = !!A.tipN; $('#tBody').hidden = !A.tipN && !shifts.length;
     $('#tKpis').innerHTML = [['Total tips', money(A.tips), 1], ['Tip $/hr (after tip-out)', rate(A.tipRate), 1], ['Cash', money(A.cash)], ['Card', money(A.card)], ['Tipped out', money(A.tipout)], ['Split unknown', money(A.unknown)]]
@@ -352,7 +355,7 @@
   function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); $('#darkToggle').checked = t === 'dark'; $('#themeBtn').setAttribute('aria-label', t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'); var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t === 'dark' ? '#0F1115' : '#F3F4F6'); }
 
   /* ---------- navigation ---------- */
-  var TAB = { dashboard: 'dashboard', shifts: 'shifts', stats: 'stats', profile: 'profile', log: 'shifts', settings: 'profile', tips: 'stats', reports: 'stats' }, ALIAS = { settings: 'profile', tips: 'stats', reports: 'stats' }, SUB = { dashboard: 'Performance Overview', shifts: 'Your shifts', log: 'Log a shift', stats: 'Tips & reports', profile: 'Settings & data' }, screen = 'dashboard';
+  var TAB = { dashboard: 'dashboard', shifts: 'shifts', insights: 'insights', stats: 'insights', profile: 'profile', log: 'shifts', settings: 'profile', tips: 'insights', reports: 'insights' }, ALIAS = { settings: 'profile', tips: 'insights', reports: 'insights', stats: 'insights' }, SUB = { dashboard: 'Performance Overview', shifts: 'Your shifts', log: 'Log a shift', insights: 'Tips & reports', profile: 'Settings & data' }, screen = 'dashboard';
   function go(name, sub) { name = ALIAS[name] || name; if (!document.getElementById('s-' + name)) name = 'dashboard'; screen = name; $('#hdrSub').textContent = SUB[name] || '';
     $$('.screen').forEach(function (s) { s.hidden = s.id !== 's-' + name; });
     $$('#tabbar button').forEach(function (b) { var on = b.getAttribute('data-tab') === TAB[name]; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
@@ -361,7 +364,7 @@
     if (id === 'shiftsSeg') { $('#vList').hidden = v !== 'list'; $('#vCal').hidden = v !== 'cal'; }
     else { $('#rTips').hidden = v !== 'tips'; $('#rWeek').hidden = v !== 'week'; $('#rStats').hidden = v !== 'stats'; } }
   var toastT; function toast(m) { var t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove('on'); }, 2600); }
-  function renderAll() { renderMonthPick(); renderBanner(); renderDashboard(); renderHistory(); renderCalendar(); renderTips(); renderReports(); }
+  function renderAll() { renderMonthPick(); renderBanner(); renderDashboard(); renderHistory(); renderCalendar(); renderTips(); renderReports(); renderInsightsEmpty(); }
 
   function bind() {
     $('#tabbar').addEventListener('click', function (e) { var b = e.target.closest('[data-tab]'); if (b) go(b.getAttribute('data-tab')); });
@@ -408,6 +411,7 @@
     window.addEventListener('storage', function (e) { if (e.key === K.sched) { sched = loadSched(); renderAll(); } if (e.key === K.shifts) { shifts = loadShifts(); renderAll(); } });
   }
   function init() { applyTheme(localStorage.getItem(K.theme) === 'light' ? 'light' : 'dark'); bind(); resetForm(); renderRoleSettings(); renderAll();
+    window.addEventListener('hashchange', function () { var k = (location.hash || '').slice(1); if (TAB[k] && (ALIAS[k] || k) !== screen) go(k); });
     var h = (location.hash || '').slice(1); if (prefillFromLink()) { renderAll(); go('log'); } else go(TAB[h] ? h : 'dashboard');
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function () {}); }
   window.__ttTest = { weekSummary: weekSummary, deriveShift: deriveShift, buildICS: function () { return buildICS(upcoming()); }, toCSV: toCSV, sched: function () { return sched; }, roles: function () { return roles; }, shifts: function () { return shifts; } };
