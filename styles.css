@@ -153,3 +153,10 @@ main{padding-bottom:calc(64px + env(safe-area-inset-bottom) + 28px)}
 /* v14 contrast */
 .pill .down{color:#F87171}
 html[data-theme=light] .pill .down{color:#B91C1C}
+
+/* v15 Side Work icons */
+.logo img{width:40px;height:40px;border-radius:11px;display:block;flex:none}
+.iconpick{display:flex;gap:14px;margin:6px 0 10px}
+.iconpick button{flex:1;background:var(--input);border:2px solid var(--border);border-radius:16px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text);font:inherit;font-weight:600}
+.iconpick button[aria-pressed=true]{border-color:var(--primary)}
+.iconpick img{width:64px;height:64px;border-radius:15px}

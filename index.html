@@ -7,20 +7,20 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Server Life">
-<meta name="description" content="Server Life tip tracker. Your shifts stay on your phone.">
+<meta name="apple-mobile-web-app-title" content="Side Work">
+<meta name="description" content="Side Work tip tracker. Your shifts stay on your phone.">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
-<title>Server Life · Tip Tracker</title>
+<title>Side Work · Tip Tracker</title>
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" id="atiLink" href="apple-touch-icon.png">
+<link rel="icon" id="favLink" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <header class="hdr">
   <div class="logo">
-    <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="5" width="9.5" height="9.5" rx="2.5" fill="currentColor"/><rect x="17.5" y="5" width="9.5" height="9.5" rx="2.5" fill="currentColor"/><rect x="5" y="17.5" width="9.5" height="9.5" rx="2.5" fill="currentColor"/><rect x="17.5" y="17.5" width="9.5" height="9.5" rx="2.5" fill="currentColor" opacity=".55"/></svg>
-    <div><b>Server Life</b><span id="hdrSub">Performance Overview</span></div>
+    <img id="hdrLogo" src="icon-192.png" alt="" width="40" height="40">
+    <div><b>Side Work</b><span id="hdrSub">Performance Overview</span></div>
   </div>
   <button class="ibtn boxed" id="hdrCal" aria-label="Calendar"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></button>
   <button class="ibtn boxed" id="themeBtn" aria-label="Switch to light mode"><svg viewBox="0 0 24 24" class="i-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg><svg viewBox="0 0 24 24" class="i-moon"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
@@ -162,6 +162,7 @@
         <div class="grid2"><label class="field"><span>Weekly goal $</span><input type="text" inputmode="decimal" id="gWeek" placeholder="Not set"></label><label class="field"><span>Monthly goal $</span><input type="text" inputmode="decimal" id="gMonth" placeholder="Not set"></label></div>
         <div id="goalBars"></div>
       </div>
+    <div class="card"><p class="lbl">App icon</p><div class="iconpick" id="iconPick"><button type="button" data-icon="green" aria-pressed="true"><img src="icon-192.png" alt=""><span>Green</span></button><button type="button" data-icon="dark" aria-pressed="false"><img src="icon-192-dark.png" alt=""><span>Dark</span></button></div><p class="muted s">On iPhone, the home screen icon updates after you remove the app and Add to Home Screen again.</p></div>
     <div class="card install"><p class="lbl">Install</p><p>On iPhone: Share → Add to Home Screen for a full-screen app feel.</p></div>
   </section>
 </main>

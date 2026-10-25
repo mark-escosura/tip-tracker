@@ -1,7 +1,7 @@
 {
-  "name": "Server Life",
-  "short_name": "Server Life",
-  "description": "Server Life tip tracker. Your shifts stay on your phone.",
+  "name": "Side Work",
+  "short_name": "Side Work",
+  "description": "Side Work tip tracker. Your shifts stay on your phone.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

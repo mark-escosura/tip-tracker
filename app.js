@@ -1,9 +1,9 @@
-/* Server Life · Tip Tracker. Offline-first, localStorage only. No accounts, no network, nothing shared. */
+/* Side Work · Tip Tracker. Offline-first, localStorage only. No accounts, no network, nothing shared. */
 (function () {
   'use strict';
   var $ = function (s) { return document.querySelector(s); }, $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
   var SHIFTS = ['breakfast', 'lunch', 'dinner', 'overnight'];
-  var K = { shifts: 'serverlife.shifts.v2', roles: 'serverlife.roles', last: 'serverlife.lastRole', sched: 'serverlife.schedule', goals: 'serverlife.goals', theme: 'serverlife.theme' };
+  var K = { shifts: 'serverlife.shifts.v2', roles: 'serverlife.roles', last: 'serverlife.lastRole', sched: 'serverlife.schedule', goals: 'serverlife.goals', theme: 'serverlife.theme', icon: 'serverlife.icon' };
   var OLD = { shifts: 'tiptracker.shifts.v1', roles: 'tiptracker.roles', wage: 'tiptracker.wage', sched: 'tiptracker.schedule.v1' };
   var DEFAULT_WAGE = 16.90;
   var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], DOWL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -131,7 +131,7 @@
   /* this week (Mon–Sun) summary */
   function weekInfo() { var m = monday(new Date()), a = iso(m), b = iso(addDays(m, 6)); return { a: a, b: b, A: agg(inRange(a, b)) }; }
   function weekSummary() { var w = weekInfo(), A = w.A; if (!A.n) return '';
-    return 'Server Life · week of ' + nice(w.a) + ': ' + money(A.take) + ' take-home, ' + A.n + ' shift' + (A.n > 1 ? 's' : '') + ', ' + r2(A.hours) + 'h, ' + rate(A.rate) + (A.cash + A.card ? ' (cash ' + money(A.cash) + ', card ' + money(A.card) + ')' : ''); }
+    return 'Side Work · week of ' + nice(w.a) + ': ' + money(A.take) + ' take-home, ' + A.n + ' shift' + (A.n > 1 ? 's' : '') + ', ' + r2(A.hours) + 'h, ' + rate(A.rate) + (A.cash + A.card ? ' (cash ' + money(A.cash) + ', card ' + money(A.card) + ')' : ''); }
   function copyText(t) { function fb() { var ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} ta.remove(); return ok; }
     if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(function () { return true; }, function () { return fb(); }); return Promise.resolve(fb()); }
   function renderDashboard() {
@@ -242,10 +242,10 @@
   function icsDate(d) { return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''); }
   function icsText(s) { return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
   function icsFold(l) { var out = []; while (l.length > 73) { out.push(l.slice(0, 73)); l = ' ' + l.slice(73); } out.push(l); return out.join('\r\n'); }
-  function buildICS(list) { var now = icsDate(new Date()), L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Server Life//Tip Tracker//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:Work shifts'];
+  function buildICS(list) { var now = icsDate(new Date()), L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Side Work//Tip Tracker//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:Side Work shifts'];
     list.forEach(function (x) { var t = cap(x.shift) + ' shift' + (x.role ? ' (' + x.role + ')' : '');
       L.push('BEGIN:VEVENT', 'UID:' + x.id + '@tip-tracker.mark-escosura.github.io', 'SEQUENCE:' + (x.rev || 0), 'DTSTAMP:' + now, 'DTSTART:' + icsDate(schedStart(x)), 'DTEND:' + icsDate(schedEnd(x)),
-        'SUMMARY:' + icsText(t), 'DESCRIPTION:' + icsText('Scheduled ' + fmtTime(x.start) + '–' + fmtTime(x.end) + '. After your shift, open Server Life to log your tips.'),
+        'SUMMARY:' + icsText(t), 'DESCRIPTION:' + icsText('Scheduled ' + fmtTime(x.start) + '–' + fmtTime(x.end) + '. After your shift, open Side Work to log your tips.'),
         'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsText(t + ' starts in 1 hour'), 'TRIGGER:-PT1H', 'END:VALARM',
         'BEGIN:VALARM', 'ACTION:DISPLAY', 'SUMMARY:Log your tips', 'DESCRIPTION:Log your tips', 'TRIGGER;RELATED=END:PT0S', 'END:VALARM', 'END:VEVENT'); });
     L.push('END:VCALENDAR'); return L.map(icsFold).join('\r\n') + '\r\n'; }
@@ -294,7 +294,7 @@
     var rows = shifts.slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; }).map(function (s) { var sk = splitKnown(s);
       return [s.date, s.shift, s.role, s.wage.toFixed(2), s.clockIn, s.clockOut, s.hours, sk && s.cash != null ? s.cash.toFixed(2) : '', sk && s.card != null ? s.card.toFixed(2) : '', tipsOf(s) != null ? tipsOf(s).toFixed(2) : '', (s.tipout || 0).toFixed(2), s.sales != null ? s.sales.toFixed(2) : '', r2(wages(s)).toFixed(2), r2(take(s)).toFixed(2), s.note].map(csvCell).join(','); });
     return [H.join(',')].concat(rows).join('\r\n') + '\r\n'; }
-  function exportCSV() { if (!shifts.length) { toast('No shifts to export yet'); return; } download('server-life-shifts-' + iso(new Date()) + '.csv', '\ufeff' + toCSV(), 'text/csv;charset=utf-8'); toast('Exported ' + shifts.length + ' shift' + (shifts.length > 1 ? 's' : '')); }
+  function exportCSV() { if (!shifts.length) { toast('No shifts to export yet'); return; } download('side-work-shifts-' + iso(new Date()) + '.csv', '\ufeff' + toCSV(), 'text/csv;charset=utf-8'); toast('Exported ' + shifts.length + ' shift' + (shifts.length > 1 ? 's' : '')); }
 
   /* ---------- log form ---------- */
   var editing = null, formWage = null;
@@ -352,6 +352,7 @@
     $('#roleList').innerHTML = roles.map(function (r) { return '<div class="role-row" data-id="' + esc(r.id) + '"><input type="text" class="rName" maxlength="40" value="' + esc(r.name) + '" aria-label="Role name"><span>$</span><input type="text" inputmode="decimal" class="rWage" value="' + r.wage.toFixed(2) + '" aria-label="' + esc(r.name) + ' hourly wage"><button type="button" class="ibtn rDel" aria-label="Delete ' + esc(r.name) + '"' + (roles.length < 2 ? ' disabled' : '') + '>✕</button></div>'; }).join('');
     rolesRendering = false; }
   function rolesChanged(msg) { saveRoles(); renderRoleSettings(); renderAll(); if (msg) toast(msg); }
+  function applyIcon(v) { v = v === 'dark' ? 'dark' : 'green'; var s = v === 'dark' ? '-dark' : ''; $('#hdrLogo').src = 'icon-192' + s + '.png'; $('#atiLink').href = 'apple-touch-icon' + s + '.png'; $('#favLink').href = 'favicon-32' + s + '.png'; $$('#iconPick button').forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-icon') === v ? 'true' : 'false'); }); }
   function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); $('#darkToggle').checked = t === 'dark'; $('#themeBtn').setAttribute('aria-label', t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'); var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t === 'dark' ? '#0F1115' : '#F3F4F6'); }
 
   /* ---------- navigation ---------- */
@@ -399,6 +400,7 @@
     ['#gWeek', '#gMonth'].forEach(function (s) { $(s).addEventListener('change', function () { var v = num(this.value), g = getJSON(K.goals) || {}; if (v != null && (isNaN(v) || v < 0)) { toast('Goal should be a number'); this.value = ''; return; }
       g[s === '#gWeek' ? 'week' : 'month'] = v ? r2(v) : null; setJSON(K.goals, g); renderReports(); }); });
     $('#csvBtn').addEventListener('click', exportCSV); $('#repCsv').addEventListener('click', exportCSV);
+    $('#iconPick').addEventListener('click', function (e) { var b = e.target.closest('[data-icon]'); if (!b) return; var v = b.getAttribute('data-icon'); localStorage.setItem(K.icon, v); applyIcon(v); toast(v === 'dark' ? 'Dark icon on' : 'Green icon on'); });
     $('#darkToggle').addEventListener('change', function () { var t = this.checked ? 'dark' : 'light'; localStorage.setItem(K.theme, t); applyTheme(t); });
     $('#roleList').addEventListener('change', function (e) { if (rolesRendering) return; var row = e.target.closest('.role-row'); if (!row) return; var r = roles.find(function (x) { return x.id === row.getAttribute('data-id'); }); if (!r) return;
       if (e.target.classList.contains('rName')) { var n = e.target.value.trim().slice(0, 40), dup = roleByName(n); if (!n || (dup && dup !== r)) { e.target.value = r.name; toast(n ? 'You already have ' + n : 'Role needs a name'); return; } r.name = n; rolesChanged('Renamed to ' + n + ' (past shifts keep their saved name)'); }
@@ -410,7 +412,7 @@
       roles.push({ id: uid('r'), name: n, wage: r2(v) }); $('#newRoleName').value = ''; $('#newRoleWage').value = ''; rolesChanged('Added ' + n + ' $' + r2(v).toFixed(2) + '/hr'); });
     window.addEventListener('storage', function (e) { if (e.key === K.sched) { sched = loadSched(); renderAll(); } if (e.key === K.shifts) { shifts = loadShifts(); renderAll(); } });
   }
-  function init() { applyTheme(localStorage.getItem(K.theme) === 'light' ? 'light' : 'dark'); bind(); resetForm(); renderRoleSettings(); renderAll();
+  function init() { applyIcon(localStorage.getItem(K.icon)); applyTheme(localStorage.getItem(K.theme) === 'light' ? 'light' : 'dark'); bind(); resetForm(); renderRoleSettings(); renderAll();
     window.addEventListener('hashchange', function () { var k = (location.hash || '').slice(1); if (TAB[k] && (ALIAS[k] || k) !== screen) go(k); });
     var h = (location.hash || '').slice(1); if (prefillFromLink()) { renderAll(); go('log'); } else go(TAB[h] ? h : 'dashboard');
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function () {}); }
