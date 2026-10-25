@@ -1,4 +1,4 @@
-:root{color-scheme:dark;--bg:#0F1115;--card:#1A1D23;--input:#242830;--primary:#10B981;--money:#34D399;--teal:#2DD4BF;--text:#F3F4F6;--text2:#9CA3AF;--text3:#6B7280;--border:#2D323C;--danger:#EF4444;--tabh:58px}
+:root{color-scheme:dark;--bg:#0F1115;--card:#1A1D23;--input:#242830;--primary:#10B981;--money:#34D399;--teal:#2DD4BF;--text:#F3F4F6;--text2:#9CA3AF;--text3:#9CA3AF;--border:#2D323C;--danger:#EF4444;--tabh:58px}
 html[data-theme=light]{color-scheme:light;--bg:#F3F4F6;--card:#FFFFFF;--input:#EEF0F3;--money:#059669;--teal:#0D9488;--text:#111827;--text2:#4B5563;--text3:#6B7280;--border:#E5E7EB}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
 button,input,select{font:inherit;color:inherit}
@@ -149,3 +149,7 @@ main{padding-bottom:calc(64px + env(safe-area-inset-bottom) + 28px)}
 .eb-btn{background:#10B981;color:#fff;border:0;border-radius:999px;padding:13px 34px;font-size:17px;font-weight:600;margin-top:8px}
 .eb-btn .pl{font-size:22px;margin-right:6px}
 .ea-sub,.ea-why p{color:var(--text2)}
+
+/* v14 contrast */
+.pill .down{color:#F87171}
+html[data-theme=light] .pill .down{color:#B91C1C}
