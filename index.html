@@ -19,53 +19,47 @@
 <body>
 <header class="hdr">
   <div class="logo">
-    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 23h22M7 23a9 9 0 0 1 18 0M16 11V9m-2 0h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-    <div><b>Server Life</b><span>Tip Tracker</span></div>
+    <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="5" width="9.5" height="9.5" rx="2.5" fill="currentColor"/><rect x="17.5" y="5" width="9.5" height="9.5" rx="2.5" fill="currentColor"/><rect x="5" y="17.5" width="9.5" height="9.5" rx="2.5" fill="currentColor"/><rect x="17.5" y="17.5" width="9.5" height="9.5" rx="2.5" fill="currentColor" opacity=".55"/></svg>
+    <div><b>Server Life</b><span id="hdrSub">Performance Overview</span></div>
   </div>
-  <button class="ibtn" id="hdrCal" aria-label="Calendar"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></button>
-  <label class="sr" for="monthPick">Month</label>
-  <select id="monthPick" class="mpick"></select>
-  <button class="ibtn" id="hdrSet" aria-label="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>
+  <button class="ibtn boxed" id="hdrCal" aria-label="Calendar"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></button>
+  <button class="ibtn boxed" id="themeBtn" aria-label="Switch to light mode"><svg viewBox="0 0 24 24" class="i-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg><svg viewBox="0 0 24 24" class="i-moon"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
 </header>
 
 <main id="main">
   <div class="banner" id="logBanner" hidden><button type="button" id="bannerText"></button><button type="button" id="bannerX" aria-label="Not now">✕</button></div>
 
-  <!-- DASHBOARD -->
-  <section class="screen" id="s-dashboard" data-title="Dashboard">
-    <h1>Dashboard</h1><p class="sub" id="dRange"></p>
+  <!-- OVERVIEW -->
+  <section class="screen" id="s-dashboard" hidden>
     <div id="dEmpty" class="card empty" hidden>
-      <p class="big">No shifts this month yet</p><p class="muted">Log a shift and your hourly rate, cash vs card and projection show up here.</p>
+      <p class="big">No shifts logged yet</p><p class="muted">Log a shift and your hourly rate, cash vs card, best day and projection show up here.</p>
       <button class="btn primary" data-go="log">Log a shift</button>
     </div>
     <div id="dBody">
       <div class="card rate-card">
-        <div class="rc-l">
-          <p class="lbl">Effective hourly rate <span class="info" title="Take-home (wages + tips − tip-out) ÷ hours">ⓘ</span></p>
-          <p class="money xl" id="dRate">—</p>
-          <p class="delta" id="dRateDelta"></p>
-        </div>
-        <div class="rc-r" id="dChart"></div>
+        <p class="lbl">Effective hourly rate <span class="info" title="Wages + tips − tip-out, divided by hours. Last 7 days.">ⓘ</span></p>
+        <div class="rate-row"><p class="money xl"><span id="dRate">—</span><small>/hr</small></p><span class="pill" id="dRatePill" hidden></span></div>
+        <p class="muted s" id="dRateSub"></p>
+        <div class="chart" id="dChart"></div>
+      </div>
+      <div class="card">
+        <p class="lbl">Cash vs card <span class="muted xs" id="dMonthLbl"></span></p>
+        <div class="cc-row"><div id="dDonut"></div><div class="legend" id="dLegend"></div></div>
+        <p class="muted xs" id="dUnknown"></p>
+        <div class="earned"><span class="wallet"><svg viewBox="0 0 24 24"><path d="M4 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a1 1 0 0 1-1-1V7zM4 7l11-3v3M16 13.5h.01"/></svg></span><div><p class="muted s">Total earned</p><p class="money l" id="dEarned">—</p></div></div>
       </div>
       <div class="row2">
-        <div class="card">
-          <p class="lbl">Cash vs card</p>
-          <div class="donut-wrap"><div id="dDonut"></div><div class="legend" id="dLegend"></div></div>
-          <p class="muted xs" id="dUnknown"></p>
-        </div>
         <div class="card best" id="dBest"></div>
+        <div class="card wk" id="dWeek"></div>
       </div>
-      <p class="lbl sec">Averages · this month</p>
-      <div class="card avgs" id="dAvgs"></div>
-      <div class="card proj">
-        <p class="lbl">Simple month projection</p>
-        <div class="proj-row"><div class="proj-ic"><svg viewBox="0 0 24 24"><path d="M4 18l5-5 4 3 7-8M15 8h5v5"/></svg></div>
-          <div class="proj-t"><p class="muted s">Projected monthly earnings</p><p class="money l" id="dProj">—</p><p class="muted xs" id="dProjHow"></p></div>
-          <div class="bars" id="dBars"></div></div>
+      <div class="card proj" id="dProjCard">
+        <p class="lbl">Month projection</p>
+        <div class="proj-row"><div class="proj-t"><p class="money xl2" id="dProj">—</p><span class="pill" id="dProjPill" hidden></span></div><div class="spark" id="dSpark"></div></div>
+        <div class="proj-foot"><span id="dProjHow"></span><span id="dDaysLeft"></span></div>
       </div>
       <div class="card next" id="dNext" hidden></div>
     </div>
-    <button class="btn primary wide" data-go="log" id="dLog">+ Log shift</button>
+    <button class="btn primary wide big" data-go="log" id="dLog">+ Log shift</button>
   </section>
 
   <!-- SHIFTS -->
@@ -104,12 +98,7 @@
     <form id="form" class="card" novalidate>
       <div class="chips" id="roleChips" role="radiogroup" aria-label="Role"></div>
       <div class="grid2"><label class="field"><span>Clock in</span><input type="time" id="fIn"></label><label class="field"><span>Clock out</span><input type="time" id="fOut"></label></div>
-      <div class="seg" role="radiogroup" aria-label="Shift">
-        <label><input type="radio" name="shift" value="breakfast"><span>Breakfast</span></label>
-        <label><input type="radio" name="shift" value="lunch"><span>Lunch</span></label>
-        <label><input type="radio" name="shift" value="dinner"><span>Dinner</span></label>
-        <label><input type="radio" name="shift" value="overnight"><span>Overnight</span></label>
-      </div>
+      <p class="autoshift" id="autoShift" aria-live="polite"></p>
       <div class="grid2">
         <label class="field big"><span>Cash tips $</span><input type="text" inputmode="decimal" id="fCash" placeholder="0" autocomplete="off"></label>
         <label class="field big"><span>Card tips $</span><input type="text" inputmode="decimal" id="fCard" placeholder="0" autocomplete="off"></label>
@@ -127,22 +116,18 @@
     </form>
   </section>
 
-  <!-- TIPS -->
-  <section class="screen" id="s-tips" data-title="Tips" hidden>
-    <h1>Tips</h1><p class="sub" id="tRange"></p>
-    <div id="tEmpty" class="card empty" hidden><p class="big">No tips logged this month</p><p class="muted">Cash and card tips you log show up here.</p></div>
+  <!-- STATS -->
+  <section class="screen" id="s-stats" hidden>
+    <div class="h1row"><h1>Stats</h1><label class="sr" for="monthPick">Month</label><select id="monthPick" class="mpick"></select></div>
+    <div class="segtabs" id="repSeg"><button data-v="tips" class="on">Tips</button><button data-v="week">Weekly</button><button data-v="stats">All time</button></div>
+    <div id="rTips"><p class="sub" id="tRange"></p><div id="tEmpty" class="card empty" hidden><p class="big">No tips logged this month</p><p class="muted">Cash and card tips you log show up here.</p></div>
     <div id="tBody">
       <div class="card"><div class="kpis" id="tKpis"></div></div>
       <div class="card"><p class="lbl">Tips by day</p><div id="tDays"></div></div>
       <div class="card"><p class="lbl">Average take-home by day and shift</p><div id="dayGrid" class="gridwrap"></div></div>
     </div>
-  </section>
-
-  <!-- REPORTS -->
-  <section class="screen" id="s-reports" data-title="Reports" hidden>
-    <h1>Reports</h1>
-    <div class="segtabs" id="repSeg"><button data-v="week" class="on">Weekly</button><button data-v="stats">Stats</button><button data-v="goals">Goals</button></div>
-    <div id="rWeek">
+  </div>
+    <div id="rWeek" hidden>
       <div class="card"><div class="calhead"><button class="ibtn" id="wkPrev" aria-label="Previous week">‹</button><div><b id="wkTitle"></b><span class="muted s" id="wkSub"></span></div><button class="ibtn" id="wkNext" aria-label="Next week">›</button></div>
         <div class="kpis" id="wkKpis"></div><div id="wkDays"></div></div>
     </div>
@@ -151,20 +136,13 @@
       <div class="card" id="stRoles"></div>
       <div class="card"><p class="lbl">Best shifts</p><ol class="bestlist" id="stBest"></ol></div>
     </div>
-    <div id="rGoals" hidden>
-      <div class="card">
-        <p class="lbl">Goals (take-home)</p>
-        <div class="grid2"><label class="field"><span>Weekly goal $</span><input type="text" inputmode="decimal" id="gWeek" placeholder="Not set"></label><label class="field"><span>Monthly goal $</span><input type="text" inputmode="decimal" id="gMonth" placeholder="Not set"></label></div>
-        <div id="goalBars"></div>
-      </div>
-    </div>
+    
     <button class="btn ghost wide" id="repCsv">Export CSV</button>
-    <button class="btn ghost wide" data-go="settings">Settings</button>
   </section>
 
-  <!-- SETTINGS -->
-  <section class="screen" id="s-settings" data-title="Settings" hidden>
-    <div class="h1row"><h1>Settings</h1><button class="btn ghost sm" data-go="dashboard">Done</button></div>
+  <!-- PROFILE -->
+  <section class="screen" id="s-profile" hidden>
+    <h1>Profile</h1>
     <div class="card">
       <div class="setrow"><span>Dark mode</span><label class="switch"><input type="checkbox" id="darkToggle" checked><i></i></label></div>
     </div>
@@ -179,14 +157,21 @@
       <button class="btn primary wide" id="csvBtn">Export CSV</button>
       <p class="muted xs">Everything stays on this phone. No accounts, no bank, nothing shared.</p>
     </div>
+  
+    <div class="card">
+        <p class="lbl">Goals (take-home)</p>
+        <div class="grid2"><label class="field"><span>Weekly goal $</span><input type="text" inputmode="decimal" id="gWeek" placeholder="Not set"></label><label class="field"><span>Monthly goal $</span><input type="text" inputmode="decimal" id="gMonth" placeholder="Not set"></label></div>
+        <div id="goalBars"></div>
+      </div>
+    <div class="card install"><p class="lbl">Install</p><p>On iPhone: Share → Add to Home Screen for a full-screen app feel.</p></div>
   </section>
 </main>
 
 <nav class="tabbar" id="tabbar" aria-label="Main">
-  <button data-tab="dashboard" class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>Dashboard</span></button>
-  <button data-tab="shifts"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Shifts</span></button>
-  <button data-tab="tips"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.2c-.5-1-1.6-1.5-2.8-1.5-1.6 0-2.8.8-2.8 2.1 0 3 5.8 1.5 5.8 4.4 0 1.3-1.3 2.1-3 2.1-1.3 0-2.5-.6-3-1.6M12 6v1.7M12 16.3V18"/></svg><span>Tips</span></button>
-  <button data-tab="reports"><svg viewBox="0 0 24 24"><path d="M6 20v-6M12 20V9M18 20V4"/></svg><span>Reports</span></button>
+  <button data-tab="dashboard" class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>Overview</span></button>
+  <button data-tab="shifts"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>Shifts</span></button>
+  <button data-tab="stats"><svg viewBox="0 0 24 24"><path d="M6 20v-6M12 20V9M18 20V4"/></svg><span>Stats</span></button>
+  <button data-tab="profile"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1-4 4-6 7.5-6s6.5 2 7.5 6"/></svg><span>Profile</span></button>
 </nav>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="app.js"></script>

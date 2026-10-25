@@ -95,53 +95,83 @@
   function pct(a, b) { if (a == null || b == null || !b) return null; return (a - b) / Math.abs(b) * 100; }
   function deltaHTML(p, vs) { if (p == null) return '<span class="muted">' + (vs ? 'No data for ' + vs : '') + '</span>'; var up = p >= 0;
     return '<span class="' + (up ? 'up' : 'down') + '">' + (up ? '↑ ' : '↓ ') + Math.abs(p).toFixed(1) + '%</span>' + (vs ? ' vs ' + vs : ''); }
-  function lineChart(pts, R) { /* pts: [{d:dayIndex, v:value}] */
-    if (pts.length < 2) return '<p class="muted xs" style="margin-top:30px;text-align:center">The chart fills in after shifts on 2 different days.</p>';
-    var W = 340, H = 130, L = 4, Rr = 34, T = 8, B = 20, vs = pts.map(function (p) { return p.v; }), mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
-    if (mx - mn < 1) { mn -= 1; mx += 1; } var span = Math.max(1, R.days - 1);
-    var X = function (d) { return L + (W - L - Rr) * d / span; }, Y = function (v) { return T + (H - T - B) * (1 - (v - mn) / (mx - mn)); };
-    var line = pts.map(function (p, i) { return (i ? 'L' : 'M') + X(p.d).toFixed(1) + ' ' + Y(p.v).toFixed(1); }).join(' ');
-    var area = line + ' L' + X(pts[pts.length - 1].d).toFixed(1) + ' ' + (H - B) + ' L' + X(pts[0].d).toFixed(1) + ' ' + (H - B) + ' Z', last = pts[pts.length - 1];
-    var ticks = [mx, (mx + mn) / 2, mn].map(function (v) { return '<text class="axis" x="' + (W - Rr + 4) + '" y="' + (Y(v) + 3).toFixed(1) + '">$' + Math.round(v) + '</text>'; }).join('');
-    var xl = [0, Math.round(span / 2), span].map(function (d) { return '<text class="axis" x="' + X(d).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + (d === 0 ? 'start' : d === span ? 'end' : 'middle') + '">' + MON[R.start.getMonth()] + ' ' + (d + 1) + '</text>'; }).join('');
-    return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Effective hourly rate by day"><defs><linearGradient id="ga" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#2DD4BF" stop-opacity=".45"/><stop offset="1" stop-color="#2DD4BF" stop-opacity="0"/></linearGradient></defs>' +
-      '<path d="' + area + '" fill="url(#ga)"/><path d="' + line + '" fill="none" stroke="#2DD4BF" stroke-width="2" stroke-linejoin="round"/><circle cx="' + X(last.d).toFixed(1) + '" cy="' + Y(last.v).toFixed(1) + '" r="3.5" fill="#2DD4BF"/>' + ticks + xl + '</svg>'; }
-  function donut(cash, card) { var tot = cash + card, C = 2 * Math.PI * 40, f = tot > 0 ? cash / tot : 0;
-    return '<svg viewBox="0 0 110 110" role="img" aria-label="Cash vs card"><circle cx="55" cy="55" r="40" fill="none" stroke="' + (tot > 0 ? '#6B7280' : '#2D323C') + '" stroke-width="14"/>' +
-      (tot > 0 ? '<circle cx="55" cy="55" r="40" fill="none" stroke="#2DD4BF" stroke-width="14" stroke-dasharray="' + (C * f).toFixed(2) + ' ' + C.toFixed(2) + '" transform="rotate(-90 55 55)"/>' : '') +
-      '<text x="55" y="55" text-anchor="middle" font-size="15" font-weight="700" fill="currentColor">' + money0(tot) + '</text><text x="55" y="70" text-anchor="middle" font-size="9" fill="#9CA3AF">Total tips</text></svg>'; }
   function similarAvg(x, list) { var m = list.filter(function (s) { return s.shift === x.shift && s.role === x.role; }); if (!m.length) m = list.filter(function (s) { return s.shift === x.shift; }); return m.length ? agg(m).take / m.length : null; }
-  function projection(R, list) { var A = agg(list);
-    if (!R.current) return { v: A.take, how: 'Month total (finished month)' };
-    var now = new Date(), rest = sched.filter(function (x) { return x.date.slice(0, 7) === R.ym && schedStart(x) > now && !schedLogged(x); }), est = 0, used = 0, skip = 0;
-    rest.forEach(function (x) { var g = similarAvg(x, shifts); if (g != null) { est += g; used++; } else skip++; });
-    if (used) return { v: A.take + est, how: money(A.take) + ' so far + ' + used + ' scheduled shift' + (used > 1 ? 's' : '') + ' at your average for shifts like them' + (skip ? ' (' + skip + ' not counted, no similar shifts yet)' : '') };
-    var dd = R.through.getDate(); return { v: A.take / dd * R.days, how: 'Based on your current daily average (' + money(A.take) + ' in ' + dd + ' days)' + (rest.length ? ' · ' + rest.length + ' scheduled not counted' : '') }; }
+
+  function pill(p, txt) { if (p == null || !isFinite(p)) return null; var up = p >= 0; return '<span class="' + (up ? 'up' : 'down') + '">' + (up ? '↑ ' : '↓ ') + Math.abs(p).toFixed(1) + '%</span> ' + txt; }
+  function setPill(sel, html) { var el = $(sel); el.hidden = !html; el.className = 'pill' + (html && html.indexOf('down') > 0 ? ' neg' : ''); el.innerHTML = html || ''; }
+  function inRange(a, b) { return shifts.filter(function (s) { return s.date >= a && s.date <= b; }); }
+  var chartPts = [];
+  /* rate line chart: one dot per worked day, last 30 days */
+  function lineChart(pts) {
+    if (pts.length < 2) return '<p class="muted s chart-empty">Your rate chart fills in after shifts on 2 different days.</p>';
+    var W = 400, H = 170, L = 40, Rr = 10, T = 12, B = 24, vs = pts.map(function (p) { return p.v; }), mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
+    var pad0 = Math.max(2, (mx - mn) * 0.15); mn = Math.max(0, mn - pad0); mx += pad0;
+    var t0 = pts[0].t, t1 = pts[pts.length - 1].t, X = function (t) { return L + (W - L - Rr) * (t - t0) / (t1 - t0); }, Y = function (v) { return T + (H - T - B) * (1 - (v - mn) / (mx - mn)); };
+    var line = pts.map(function (p, i) { return (i ? 'L' : 'M') + X(p.t).toFixed(1) + ' ' + Y(p.v).toFixed(1); }).join(' ');
+    var area = line + ' L' + X(t1).toFixed(1) + ' ' + (H - B) + ' L' + X(t0).toFixed(1) + ' ' + (H - B) + ' Z';
+    var grid = [0, 1, 2, 3].map(function (i) { var v = mn + (mx - mn) * i / 3; return '<line x1="' + L + '" x2="' + (W - Rr) + '" y1="' + Y(v).toFixed(1) + '" y2="' + Y(v).toFixed(1) + '" class="gl"/><text class="axis" x="' + (L - 6) + '" y="' + (Y(v) + 4).toFixed(1) + '" text-anchor="end">$' + Math.round(v) + '</text>'; }).join('');
+    var idx = pts.length <= 4 ? pts.map(function (_, i) { return i; }) : [0, Math.round((pts.length - 1) / 3), Math.round((pts.length - 1) * 2 / 3), pts.length - 1];
+    var xl = idx.map(function (i, k) { var p = pts[i], d = fromIso(p.d); return '<text class="axis" x="' + X(p.t).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + (k === 0 ? 'start' : k === idx.length - 1 ? 'end' : 'middle') + '">' + MON[d.getMonth()] + ' ' + d.getDate() + '</text>'; }).join('');
+    chartPts = pts.map(function (p) { return { x: X(p.t) / W, y: Y(p.v) / H, d: p.d, v: p.v }; });
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Effective hourly rate by day"><defs><linearGradient id="ga" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#2DD4BF" stop-opacity=".35"/><stop offset="1" stop-color="#2DD4BF" stop-opacity="0"/></linearGradient></defs>' + grid +
+      '<path d="' + area + '" fill="url(#ga)"/><path d="' + line + '" fill="none" stroke="#2DD4BF" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+      pts.map(function (p, i) { return '<circle class="dot" data-i="' + i + '" cx="' + X(p.t).toFixed(1) + '" cy="' + Y(p.v).toFixed(1) + '" r="4.5"/>'; }).join('') + xl + '</svg><div class="tip" id="chartTip" hidden></div>'; }
+  function chartPoint(e) { var el = $('#dChart svg'); if (!el || !chartPts.length) return; var r = el.getBoundingClientRect(), x = ((e.touches ? e.touches[0].clientX : e.clientX) - r.left) / r.width, best = 0;
+    chartPts.forEach(function (p, i) { if (Math.abs(p.x - x) < Math.abs(chartPts[best].x - x)) best = i; });
+    var p = chartPts[best], tip = $('#chartTip'); tip.hidden = false; tip.innerHTML = '<b>' + rate(p.v) + '</b><span>' + nice(p.d) + '</span>';
+    tip.style.left = Math.min(Math.max(p.x * 100, 14), 86) + '%'; tip.style.top = (p.y * r.height) + 'px';
+    $$('#dChart .dot').forEach(function (c, i) { c.classList.toggle('on', i === best); }); }
+  function donut(cash, card) { var tot = cash + card, C = 2 * Math.PI * 42, f = tot > 0 ? card / tot : 0;
+    return '<svg viewBox="0 0 120 120" role="img" aria-label="Cash vs card"><circle cx="60" cy="60" r="42" fill="none" stroke="' + (tot > 0 ? '#3B4250' : '#2D323C') + '" stroke-width="14"/>' +
+      (tot > 0 ? '<circle cx="60" cy="60" r="42" fill="none" stroke="#2DD4BF" stroke-width="14" stroke-linecap="' + (f > 0 && f < 1 ? 'round' : 'butt') + '" stroke-dasharray="' + (C * f).toFixed(2) + ' ' + C.toFixed(2) + '" transform="rotate(-90 60 60)"/>' : '') +
+      '<text x="60" y="62" text-anchor="middle" font-size="22" font-weight="800" fill="currentColor">' + (tot > 0 ? Math.round(f * 100) + '%' : '—') + '</text><text x="60" y="80" text-anchor="middle" font-size="11" fill="#9CA3AF">Card</text></svg>'; }
+  function spark(vals) { if (vals.length < 2) return ''; var mx = Math.max.apply(null, vals.concat([1])), W = 120, H = 44;
+    var d = vals.map(function (v, i) { return (i ? 'L' : 'M') + (W * i / (vals.length - 1)).toFixed(1) + ' ' + (H - 3 - (H - 6) * v / mx).toFixed(1); }).join(' ');
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true"><path d="' + d + '" fill="none" stroke="#2DD4BF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'; }
+  /* this week (Mon–Sun) summary */
+  function weekInfo() { var m = monday(new Date()), a = iso(m), b = iso(addDays(m, 6)); return { a: a, b: b, A: agg(inRange(a, b)) }; }
+  function weekSummary() { var w = weekInfo(), A = w.A; if (!A.n) return '';
+    return 'Server Life · week of ' + nice(w.a) + ': ' + money(A.take) + ' take-home, ' + A.n + ' shift' + (A.n > 1 ? 's' : '') + ', ' + r2(A.hours) + 'h, ' + rate(A.rate) + (A.cash + A.card ? ' (cash ' + money(A.cash) + ', card ' + money(A.card) + ')' : ''); }
+  function copyText(t) { function fb() { var ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} ta.remove(); return ok; }
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(function () { return true; }, function () { return fb(); }); return Promise.resolve(fb()); }
   function renderDashboard() {
-    var R = monthRange(period), list = inMonth(period).filter(function (s) { return s.date <= iso(R.through) || !R.current; }), A = agg(list);
-    var P = monthRange(prevYm(period)), PA = agg(inMonth(P.ym));
-    $('#dRange').textContent = rangeText(R);
-    $('#dEmpty').hidden = !!A.n; $('#dBody').hidden = !A.n; if (!A.n) return;
-    var vsTxt = MON[P.start.getMonth()] + ' 1 – ' + MON[P.end.getMonth()] + ' ' + P.end.getDate();
-    $('#dRate').textContent = A.rate != null ? '$' + A.rate.toFixed(2) : '—';
-    $('#dRateDelta').innerHTML = deltaHTML(PA.n ? pct(A.rate, PA.rate) : null, PA.n ? vsTxt : vsTxt);
-    var byDay = {}; list.forEach(function (s) { (byDay[s.date] = byDay[s.date] || []).push(s); });
-    var cT = 0, cH = 0, pts = Object.keys(byDay).sort().map(function (d) { var a = agg(byDay[d]); cT += a.take; cH += a.hours; return { d: fromIso(d).getDate() - 1, v: cT / cH }; });
-    $('#dChart').innerHTML = lineChart(pts, R);
-    var tot = A.cash + A.card;
+    var now = new Date(), t = iso(now), has = shifts.length > 0;
+    $('#dEmpty').hidden = has; $('#dBody').hidden = !has; if (!has) return;
+    /* rate: last 7 days vs the 7 before */
+    var L7 = agg(inRange(iso(addDays(now, -6)), t)), P7 = agg(inRange(iso(addDays(now, -13)), iso(addDays(now, -7))));
+    $('#dRate').textContent = L7.rate != null ? L7.rate.toFixed(2) : '—';
+    $('#dRateSub').textContent = L7.n ? 'Last 7 days · ' + money(L7.take) + ' in ' + r2(L7.hours) + 'h' : 'No shifts in the last 7 days';
+    setPill('#dRatePill', L7.n && P7.n ? pill(pct(L7.rate, P7.rate), 'vs last 7 days') : null);
+    var byDay = {}; inRange(iso(addDays(now, -29)), t).forEach(function (s) { (byDay[s.date] = byDay[s.date] || []).push(s); });
+    var pts = Object.keys(byDay).sort().map(function (d) { return { d: d, t: fromIso(d).getTime(), v: agg(byDay[d]).rate }; });
+    $('#dChart').innerHTML = lineChart(pts);
+    /* this month */
+    var ym = t.slice(0, 7), R = monthRange(ym), list = inMonth(ym).filter(function (s) { return s.date <= t; }), A = agg(list), tot = A.cash + A.card;
+    $('#dMonthLbl').textContent = '· ' + MONL[R.start.getMonth()];
     $('#dDonut').innerHTML = donut(A.cash, A.card);
-    $('#dLegend').innerHTML = tot > 0 ? '<div><i style="background:#2DD4BF"></i>Cash<b>' + money0(A.cash) + ' <span class="muted">(' + (A.cash / tot * 100).toFixed(1) + '%)</span></b></div><div><i style="background:#6B7280"></i>Card<b>' + money0(A.card) + ' <span class="muted">(' + (A.card / tot * 100).toFixed(1) + '%)</span></b></div>' : '<p class="muted xs">No cash/card tips logged this month.</p>';
-    $('#dUnknown').textContent = A.unknown ? money(A.unknown) + ' older tips with no cash/card split (not in the chart)' : '';
-    var best = null; Object.keys(byDay).forEach(function (d) { var a = agg(byDay[d]); if (a.rate != null && (!best || a.rate > best.a.rate)) best = { d: d, a: a }; });
-    $('#dBest').innerHTML = best ? '<span class="trophy" aria-hidden="true">🏆</span><p class="lbl">Best day</p><h3>' + DOWL[fromIso(best.d).getDay()] + '</h3><p class="muted s" style="margin:0">' + MONL[fromIso(best.d).getMonth()].slice(0, 3) + ' ' + fromIso(best.d).getDate() + ', ' + best.d.slice(0, 4) + '</p><p class="money">$' + best.a.rate.toFixed(2) + '</p><p class="muted s" style="margin:0">Effective hourly rate</p><div class="foot">' + money0(best.a.take) + ' in ' + r2(best.a.hours) + ' hrs</div>' : '';
-    function av(a) { return { tips: a.tipN ? a.tips / a.tipN : null, hrs: a.n ? a.hours / a.n : null, rate: a.rate, n: a.n }; }
-    var c = av(A), p = av(PA);
-    function cell(k, v, d, g) { return '<div><p class="k">' + k + '</p><p class="v' + (g ? ' g' : '') + '">' + v + '</p><p class="d">' + d + '</p></div>'; }
-    $('#dAvgs').innerHTML = cell('Avg tips / shift', c.tips == null ? '—' : money(c.tips), deltaHTML(PA.n ? pct(c.tips, p.tips) : null), 1) + cell('Avg hours / shift', c.hrs.toFixed(2), deltaHTML(PA.n ? pct(c.hrs, p.hrs) : null)) +
-      cell('Avg effective rate', c.rate == null ? '—' : money(c.rate), deltaHTML(PA.n ? pct(c.rate, p.rate) : null), 1) + cell('Shifts', c.n, R.current ? 'This month' : MON[R.start.getMonth()]);
-    var pr = projection(R, list); $('#dProj').textContent = money0(pr.v); $('#dProjHow').textContent = pr.how;
-    var wk = [], cur = monday(R.start); while (cur <= R.end) { var s0 = iso(cur), e0 = iso(addDays(cur, 6)); wk.push(agg(list.filter(function (s) { return s.date >= s0 && s.date <= e0; })).take); cur = addDays(cur, 7); }
-    var mx = Math.max.apply(null, wk.concat([1])); $('#dBars').innerHTML = wk.map(function (v, i) { return '<i style="height:' + Math.max(3, v / mx * 100).toFixed(0) + '%" title="Week ' + (i + 1) + ': ' + money0(v) + '"></i>'; }).join('');
+    $('#dLegend').innerHTML = tot > 0 ? '<div><i class="c-card"></i><span>Card</span><b>' + Math.round(A.card / tot * 100) + '% · ' + money(A.card) + '</b></div><div><i class="c-cash"></i><span>Cash</span><b>' + Math.round(A.cash / tot * 100) + '% · ' + money(A.cash) + '</b></div>' : '<p class="muted s">No cash/card tips this month yet.</p>';
+    $('#dUnknown').textContent = A.unknown ? money(A.unknown) + ' in older tips has no cash/card split (not in the donut)' : '';
+    $('#dEarned').textContent = A.n ? money(A.take) : '$0.00';
+    /* best day this month */
+    var dm = {}; list.forEach(function (s) { (dm[s.date] = dm[s.date] || []).push(s); }); var dk = Object.keys(dm), best = null;
+    dk.forEach(function (d) { var a = agg(dm[d]); if (!best || a.take > best.a.take) best = { d: d, a: a }; });
+    var avgDay = dk.length ? A.take / dk.length : null;
+    $('#dBest').innerHTML = '<div class="ch"><span class="ic">🏆</span><p class="lbl">Best day</p></div>' + (best ? '<p class="money l">' + money(best.a.take) + '</p><p class="muted s">' + DOW[fromIso(best.d).getDay()] + ', ' + MON[fromIso(best.d).getMonth()] + ' ' + fromIso(best.d).getDate() + ' · ' + rate(best.a.rate) + '</p>' +
+      (dk.length > 1 && avgDay > 0 ? '<p class="pill sm">' + pill(pct(best.a.take, avgDay), 'above avg.') + '</p>' : '') : '<p class="muted s">No shifts this month yet.</p>');
+    /* weekly averages: last 4 weeks, only counting weeks since your first shift */
+    var first = shifts.reduce(function (m, s) { return s.date < m ? s.date : m; }, t), from = iso(addDays(now, -27)); if (first > from) from = first;
+    var weeks = Math.max(1, Math.ceil(((fromIso(t) - fromIso(from)) / 864e5 + 1) / 7)), W4 = agg(inRange(from, t)), w = weekInfo();
+    $('#dWeek').innerHTML = '<div class="ch"><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 20v-6M12 20V9M18 20V4"/></svg></span><p class="lbl">Weekly averages</p></div>' +
+      '<div class="wrow"><span>Shifts / week</span><b>' + (W4.n ? (W4.n / weeks).toFixed(1) : '—') + '</b></div><div class="wrow"><span>Hours / shift</span><b>' + (W4.n ? (W4.hours / W4.n).toFixed(1) : '—') + '</b></div><div class="wrow"><span>Earned / shift</span><b class="g">' + (W4.n ? money(W4.take / W4.n) : '—') + '</b></div>' +
+      '<div class="thisweek"><p class="muted xs">This week</p><p><b class="g" id="wkTotal">' + money(w.A.take) + '</b> · <span id="wkRate">' + rate(w.A.rate) + '</span></p><button type="button" class="btn sm wide" id="copySum"' + (w.A.n ? '' : ' disabled') + '>Copy summary</button></div>';
+    /* projection: so far + current 7-day daily average × days remaining */
+    var daysLeft = R.days - now.getDate(), perDay = L7.take / 7, proj = A.take + perDay * daysLeft, PM = agg(inMonth(prevYm(ym)));
+    $('#dProj').textContent = money(proj);
+    setPill('#dProjPill', PM.n ? pill(pct(proj, PM.take), 'vs last month') : null);
+    $('#dProjHow').textContent = L7.n ? 'Based on current 7-day average' : 'No shifts in the last 7 days, so this is what you have so far';
+    $('#dDaysLeft').textContent = daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + ' remaining';
+    var cum = 0, cv = []; for (var d = 1; d <= now.getDate(); d++) { var di = ym + '-' + pad(d); (dm[di] || []).forEach(function (s) { cum += take(s); }); cv.push(cum); }
+    $('#dSpark').innerHTML = spark(cv);
     var nx = upcoming()[0]; $('#dNext').hidden = !nx;
     if (nx) $('#dNext').innerHTML = '<p class="lbl">Next scheduled shift</p><p><b>' + nice(nx.date) + ' · ' + cap(nx.shift) + '</b> <span class="muted">' + fmtTime(nx.start) + '–' + fmtTime(nx.end) + '</span></p>';
   }
@@ -264,27 +294,31 @@
   function exportCSV() { if (!shifts.length) { toast('No shifts to export yet'); return; } download('server-life-shifts-' + iso(new Date()) + '.csv', '\ufeff' + toCSV(), 'text/csv;charset=utf-8'); toast('Exported ' + shifts.length + ' shift' + (shifts.length > 1 ? 's' : '')); }
 
   /* ---------- log form ---------- */
-  var editing = null, shiftTouched = false, formWage = null;
+  var editing = null, formWage = null;
   function selRole() { var r = document.querySelector('input[name=role]:checked'); return r ? r.value : null; }
   function renderRoleChips(cur) { $('#roleChips').hidden = roles.length < 2;
     $('#roleChips').innerHTML = roles.map(function (r) { return '<label><input type="radio" name="role" value="' + esc(r.name) + '"' + (r.name === cur ? ' checked' : '') + '><span>' + esc(r.name) + '<em>$' + r.wage.toFixed(2) + '</em></span></label>'; }).join('');
     if (cur && !roleByName(cur)) { $('#roleChips').hidden = false; $('#roleChips').insertAdjacentHTML('beforeend', '<label><input type="radio" name="role" value="' + esc(cur) + '" checked><span>' + esc(cur) + '<em>deleted</em></span></label>'); } }
-  function guessShift() { if (shiftTouched) return; var g = shiftFor(normTime($('#fIn').value)) || shiftFor(pad(new Date().getHours()) + ':' + pad(new Date().getMinutes())); $$('input[name=shift]').forEach(function (r) { r.checked = r.value === g; }); }
-  function resetForm() { editing = null; pendingSched = null; formWage = null; $('#form').reset(); $('#fDate').value = iso(new Date()); renderRoleChips(defaultRole().name); shiftTouched = false; guessShift();
+  /* shift type comes from clock in/out (overnight-aware); records without times keep their saved shift */
+  var keptShift = null;
+  function deriveShift(ci, co) { if (!okTime(ci)) return null; var g = shiftFor(ci); if (okTime(co) && co <= ci && g === 'dinner' && +co.slice(0, 2) >= 2) g = 'overnight'; return g; }
+  function guessShift() { var ci = normTime($('#fIn').value), co = normTime($('#fOut').value), g = deriveShift(ci, co) || keptShift, h = spanHours(ci, co);
+    $('#autoShift').innerHTML = g ? 'Shift: <b>' + cap(g) + '</b>' + (h ? ' · ' + h + 'h' + (co && co <= ci ? ' (ends next day)' : '') : '') : '<span class="muted">Shift type fills in from your clock-in time</span>'; }
+  function resetForm() { editing = null; pendingSched = null; formWage = null; $('#form').reset(); keptShift = null; $('#fDate').value = iso(new Date()); renderRoleChips(defaultRole().name); guessShift();
     $('#saveBtn').textContent = 'Add shift'; $('#logTitle').textContent = 'Log shift'; $('#cancelEdit').hidden = true; $('#formErr').textContent = ''; $('#hoursHint').textContent = ''; $('#legacyNote').hidden = true; $('#more').open = false; moreSummary(); updateTake(); }
   function fillForm(s) { $('#fDate').value = s.date || iso(new Date()); renderRoleChips(s.role || defaultRole().name); formWage = okWage(s.wage) ? s.wage : null;
-    $$('input[name=shift]').forEach(function (r) { r.checked = r.value === s.shift; }); shiftTouched = !!s.shift;
+    keptShift = s.clockIn ? null : (s.shift || null);
     $('#fIn').value = s.clockIn || ''; $('#fOut').value = s.clockOut || ''; $('#fHours').value = s.hours != null ? s.hours : '';
     var legacy = s.id && tipsOf(s) != null && !splitKnown(s);
     $('#fCash').value = s.cash != null ? s.cash : ''; $('#fCard').value = s.card != null ? s.card : '';
     $('#legacyNote').hidden = !legacy; $('#legacyNote').textContent = legacy ? 'This older shift has ' + money(s.tips) + ' in tips with no cash/card split. Leave both blank to keep it, or enter cash and card to replace it.' : '';
     $('#fTipout').value = s.tipout ? s.tipout : ''; $('#fSales').value = s.sales != null ? s.sales : ''; $('#fNote').value = s.note || '';
-    $('#more').open = !!(s.sales != null || s.note || s.tipout || (s.hours && !s.clockIn)); hoursHint(); moreSummary(); updateTake(); }
-  function readForm() { var sh = document.querySelector('input[name=shift]:checked');
-    return { date: $('#fDate').value, shift: sh ? sh.value : null, role: selRole(), clockIn: normTime($('#fIn').value), clockOut: normTime($('#fOut').value), hours: num($('#fHours').value),
+    $('#more').open = !!(s.sales != null || s.note || s.tipout || (s.hours && !s.clockIn)); guessShift(); hoursHint(); moreSummary(); updateTake(); }
+  function readForm() { var ci = normTime($('#fIn').value), co = normTime($('#fOut').value);
+    return { date: $('#fDate').value, shift: deriveShift(ci, co) || keptShift, role: selRole(), clockIn: normTime($('#fIn').value), clockOut: normTime($('#fOut').value), hours: num($('#fHours').value),
       cash: num($('#fCash').value), card: num($('#fCard').value), tipout: num($('#fTipout').value), sales: num($('#fSales').value), note: $('#fNote').value.trim() }; }
-  function validate(f) { if (!/^\d{4}-\d{2}-\d{2}$/.test(f.date || '')) return 'Pick a date.'; if (!f.shift) return 'Pick a shift.'; if (!f.role) return 'Pick a role.';
-    if (!!f.clockIn !== !!f.clockOut) return 'Add both clock in and clock out (or neither).'; if (f.hours == null && !f.clockIn) return 'Add your clock in and clock out times.';
+  function validate(f) { if (!/^\d{4}-\d{2}-\d{2}$/.test(f.date || '')) return 'Pick a date.'; if (!f.role) return 'Pick a role.';
+    if (!!f.clockIn !== !!f.clockOut) return 'Add both clock in and clock out.'; if (!f.shift) return 'Add your clock in and clock out times.';
     if (!(f.hours > 0) || f.hours > 24) return 'Hours should be between 0 and 24.';
     if ([f.cash, f.card, f.tipout, f.sales].some(function (v) { return v != null && (isNaN(v) || v < 0); })) return 'Amounts should be numbers, 0 or more.'; return ''; }
   function editingRec() { return editing ? shifts.find(function (x) { return x.id === editing; }) : null; }
@@ -306,8 +340,8 @@
     save(); toast((prev ? 'Updated' : 'Saved') + ' · ' + money(take(rec)) + ' take-home · ' + rate(take(rec) / rec.hours)); resetForm(); period = rec.date.slice(0, 7) <= iso(new Date()).slice(0, 7) ? rec.date.slice(0, 7) : period; renderAll(); go(prev ? 'shifts' : 'dashboard'); }
   function prefillFromLink() { var q = new URLSearchParams(location.search); if (!q.has('log') && !q.has('in')) return false;
     var d = q.get('log'), sh = q.get('shift'), rl = roleByName(q.get('role')), ci = normTime(q.get('in')), co = normTime(q.get('out'));
-    resetForm(); fillForm({ date: /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : iso(new Date()), shift: SHIFTS.indexOf(sh) >= 0 ? sh : null, role: rl ? rl.name : null, clockIn: ci && co ? ci : null, clockOut: ci && co ? co : null, hours: ci && co ? spanHours(ci, co) : null });
-    if (!(SHIFTS.indexOf(sh) >= 0)) { shiftTouched = false; guessShift(); } return true; }
+    resetForm(); fillForm({ date: /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : iso(new Date()), shift: !(ci && co) && SHIFTS.indexOf(sh) >= 0 ? sh : null, role: rl ? rl.name : null, clockIn: ci && co ? ci : null, clockOut: ci && co ? co : null, hours: ci && co ? spanHours(ci, co) : null });
+    return true; }
 
   /* ---------- settings ---------- */
   var rolesRendering = false;
@@ -315,32 +349,34 @@
     $('#roleList').innerHTML = roles.map(function (r) { return '<div class="role-row" data-id="' + esc(r.id) + '"><input type="text" class="rName" maxlength="40" value="' + esc(r.name) + '" aria-label="Role name"><span>$</span><input type="text" inputmode="decimal" class="rWage" value="' + r.wage.toFixed(2) + '" aria-label="' + esc(r.name) + ' hourly wage"><button type="button" class="ibtn rDel" aria-label="Delete ' + esc(r.name) + '"' + (roles.length < 2 ? ' disabled' : '') + '>✕</button></div>'; }).join('');
     rolesRendering = false; }
   function rolesChanged(msg) { saveRoles(); renderRoleSettings(); renderAll(); if (msg) toast(msg); }
-  function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); $('#darkToggle').checked = t === 'dark'; var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t === 'dark' ? '#0F1115' : '#F3F4F6'); }
+  function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); $('#darkToggle').checked = t === 'dark'; $('#themeBtn').setAttribute('aria-label', t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'); var m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t === 'dark' ? '#0F1115' : '#F3F4F6'); }
 
   /* ---------- navigation ---------- */
-  var TAB = { dashboard: 'dashboard', shifts: 'shifts', tips: 'tips', reports: 'reports', log: 'shifts', settings: 'reports' }, screen = 'dashboard';
-  function go(name, sub) { if (!document.getElementById('s-' + name)) name = 'dashboard'; screen = name;
+  var TAB = { dashboard: 'dashboard', shifts: 'shifts', stats: 'stats', profile: 'profile', log: 'shifts', settings: 'profile', tips: 'stats', reports: 'stats' }, ALIAS = { settings: 'profile', tips: 'stats', reports: 'stats' }, SUB = { dashboard: 'Performance Overview', shifts: 'Your shifts', log: 'Log a shift', stats: 'Tips & reports', profile: 'Settings & data' }, screen = 'dashboard';
+  function go(name, sub) { name = ALIAS[name] || name; if (!document.getElementById('s-' + name)) name = 'dashboard'; screen = name; $('#hdrSub').textContent = SUB[name] || '';
     $$('.screen').forEach(function (s) { s.hidden = s.id !== 's-' + name; });
     $$('#tabbar button').forEach(function (b) { var on = b.getAttribute('data-tab') === TAB[name]; b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     if (sub) setSeg('shiftsSeg', sub); if (history.replaceState) history.replaceState(null, '', location.pathname + '#' + name); window.scrollTo(0, 0); }
   function setSeg(id, v) { $$('#' + id + ' button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); });
     if (id === 'shiftsSeg') { $('#vList').hidden = v !== 'list'; $('#vCal').hidden = v !== 'cal'; }
-    else { $('#rWeek').hidden = v !== 'week'; $('#rStats').hidden = v !== 'stats'; $('#rGoals').hidden = v !== 'goals'; } }
+    else { $('#rTips').hidden = v !== 'tips'; $('#rWeek').hidden = v !== 'week'; $('#rStats').hidden = v !== 'stats'; } }
   var toastT; function toast(m) { var t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove('on'); }, 2600); }
   function renderAll() { renderMonthPick(); renderBanner(); renderDashboard(); renderHistory(); renderCalendar(); renderTips(); renderReports(); }
 
   function bind() {
     $('#tabbar').addEventListener('click', function (e) { var b = e.target.closest('[data-tab]'); if (b) go(b.getAttribute('data-tab')); });
     document.addEventListener('click', function (e) { var g = e.target.closest('[data-go]'); if (!g) return; var n = g.getAttribute('data-go'); if (n === 'log' && !editing) resetForm(); go(n); });
-    $('#hdrCal').addEventListener('click', function () { go('shifts', 'cal'); }); $('#hdrSet').addEventListener('click', function () { go('settings'); });
-    $('#monthPick').addEventListener('change', function () { period = this.value; calMonth = new Date(+period.slice(0, 4), +period.slice(5) - 1, 1); calSel = null; renderAll(); });
+    $('#hdrCal').addEventListener('click', function () { go('shifts', 'cal'); });
+    $('#themeBtn').addEventListener('click', function () { var t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'; localStorage.setItem(K.theme, t); applyTheme(t); });
+    $('#dChart').addEventListener('pointerdown', chartPoint); $('#dChart').addEventListener('pointermove', chartPoint);
+    $('#dBody').addEventListener('click', function (e) { if (e.target.id !== 'copySum') return; var t = weekSummary(); if (!t) return; copyText(t).then(function (ok) { toast(ok ? 'Summary copied' : 'Couldn\'t copy. Try again.'); }); });
+    $('#monthPick').addEventListener('change', function () { period = this.value; renderAll(); });
     $('#shiftsSeg').addEventListener('click', function (e) { var b = e.target.closest('[data-v]'); if (b) setSeg('shiftsSeg', b.getAttribute('data-v')); });
     $('#repSeg').addEventListener('click', function (e) { var b = e.target.closest('[data-v]'); if (b) setSeg('repSeg', b.getAttribute('data-v')); });
     $('#logBack').addEventListener('click', function () { var was = editing; resetForm(); go(was ? 'shifts' : 'dashboard'); });
     $('#cancelEdit').addEventListener('click', function () { resetForm(); go('shifts'); });
     ['#fIn', '#fOut'].forEach(function (s) { ['input', 'change'].forEach(function (ev) { $(s).addEventListener(ev, function () { guessShift(); var sp = spanHours(normTime($('#fIn').value), normTime($('#fOut').value)); if (sp != null) $('#fHours').value = sp; hoursHint(); updateTake(); }); }); });
     $('#fHours').addEventListener('input', hoursHint); $('#form').addEventListener('input', function () { updateTake(); moreSummary(); }); $('#form').addEventListener('change', updateTake);
-    $$('input[name=shift]').forEach(function (r) { r.addEventListener('change', function () { shiftTouched = true; }); });
     $('#form').addEventListener('submit', function (e) { e.preventDefault(); var f = readForm(), err = validate(f); $('#formErr').textContent = err; if (/Hours|date/.test(err)) $('#more').open = true; if (!err) commit(f); });
     $('#hList').addEventListener('click', onShiftAction);
     $('#roleFilter').addEventListener('click', function (e) { var b = e.target.closest('[data-rf]'); if (b) { roleFilter = b.getAttribute('data-rf'); renderHistory(); } });
@@ -372,8 +408,8 @@
     window.addEventListener('storage', function (e) { if (e.key === K.sched) { sched = loadSched(); renderAll(); } if (e.key === K.shifts) { shifts = loadShifts(); renderAll(); } });
   }
   function init() { applyTheme(localStorage.getItem(K.theme) === 'light' ? 'light' : 'dark'); bind(); resetForm(); renderRoleSettings(); renderAll();
-    var h = (location.hash || '').slice(1); if (prefillFromLink()) { renderAll(); go('log'); } else go(TAB[h] || h === 'log' || h === 'settings' ? h : 'dashboard');
+    var h = (location.hash || '').slice(1); if (prefillFromLink()) { renderAll(); go('log'); } else go(TAB[h] ? h : 'dashboard');
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function () {}); }
-  window.__ttTest = { buildICS: function () { return buildICS(upcoming()); }, toCSV: toCSV, sched: function () { return sched; }, roles: function () { return roles; }, shifts: function () { return shifts; } };
+  window.__ttTest = { weekSummary: weekSummary, deriveShift: deriveShift, buildICS: function () { return buildICS(upcoming()); }, toCSV: toCSV, sched: function () { return sched; }, roles: function () { return roles; }, shifts: function () { return shifts; } };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

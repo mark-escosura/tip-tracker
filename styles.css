@@ -88,3 +88,39 @@ details#more{margin:4px 0 8px}details#more summary{cursor:pointer;color:var(--te
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 @media (max-width:370px){.avgs{grid-template-columns:repeat(2,1fr);row-gap:12px}.avgs>div:nth-child(2){border:0}}
 [hidden]{display:none!important}
+/* ---- v12 Performance Overview redesign ---- */
+main{max-width:none;padding-left:16px;padding-right:16px}
+.hdr{gap:10px}.logo svg{width:36px;height:36px}.logo b{font-size:20px}
+.ibtn.boxed{border:1px solid var(--border);background:var(--card);width:42px;height:42px;border-radius:12px}
+html[data-theme=dark] .i-moon,html[data-theme=light] .i-sun{display:none}
+.card{border-radius:18px;padding:18px;margin-bottom:14px}
+.lbl{font-size:12.5px}
+.rate-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.xl{font-size:48px;line-height:1.05}.xl small{font-size:20px;color:var(--text2);font-weight:600;margin-left:2px}.xl2{font-size:38px;line-height:1.1}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:999px;background:rgba(16,185,129,.14);color:var(--text2);font-size:13px;font-weight:600;margin:0}
+.pill .up{color:var(--money)}.pill.neg{background:rgba(239,68,68,.12)}.pill .down{color:var(--danger)}.pill.sm{font-size:12px;padding:4px 8px;margin-top:8px}
+.chart{position:relative;margin-top:12px}.chart svg{width:100%;height:auto;display:block;touch-action:pan-y}
+.chart .gl{stroke:var(--border);stroke-width:1}.axis{font-size:11px}
+.chart .dot{fill:var(--card);stroke:#2DD4BF;stroke-width:2.5}.chart .dot.on{fill:#2DD4BF;r:6.5}
+.chart-empty{text-align:center;padding:28px 0}
+.tip{position:absolute;transform:translate(-50%,calc(-100% - 12px));background:var(--input);border:1px solid var(--border);border-radius:10px;padding:6px 10px;font-size:12px;text-align:center;pointer-events:none;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+.tip b{display:block;color:var(--money);font-size:15px}.tip span{color:var(--text2)}
+.cc-row{display:flex;align-items:center;gap:18px}.cc-row svg{width:128px;height:128px;flex:none}
+.legend{flex:1}.legend div{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:14px}.legend i{width:10px;height:10px;border-radius:50%}.c-card{background:#2DD4BF}.c-cash{background:#3B4250}html[data-theme=light] .c-cash{background:#9CA3AF}
+.earned{display:flex;align-items:center;gap:12px;border-top:1px solid var(--border);margin-top:12px;padding-top:12px}.earned p{margin:0}
+.wallet{width:44px;height:44px;border-radius:12px;background:rgba(16,185,129,.14);display:flex;align-items:center;justify-content:center}.wallet svg{width:24px;height:24px;fill:none;stroke:var(--money);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.row2{gap:14px;margin-bottom:14px}.row2 .card{display:flex;flex-direction:column}
+.ch{display:flex;align-items:center;gap:8px;margin-bottom:8px}.ch .lbl{margin:0}.ic{width:30px;height:30px;border-radius:9px;background:rgba(16,185,129,.14);display:flex;align-items:center;justify-content:center;font-size:16px}
+.ic svg{width:18px;height:18px;fill:none;stroke:var(--money);stroke-width:2;stroke-linecap:round}
+.best p{margin:2px 0}.best .money{font-size:28px}
+.wrow{display:flex;justify-content:space-between;font-size:13.5px;padding:5px 0;color:var(--text2)}.wrow b{color:var(--text)}.wrow b.g,.thisweek .g{color:var(--money)}
+.thisweek{border-top:1px solid var(--border);margin-top:6px;padding-top:8px}.thisweek p{margin:0}.thisweek .btn{margin-top:8px}
+.btn:disabled{opacity:.45;cursor:default}
+.proj-row{align-items:flex-end}.proj-t p{margin:0 0 8px}.spark{flex:0 0 38%}.spark svg{width:100%;height:50px}
+.proj-foot{display:flex;justify-content:space-between;color:var(--text2);font-size:13px;margin-top:10px;gap:8px}
+.autoshift{margin:0 0 10px;font-size:14px}.autoshift b{color:var(--teal)}
+.install p:last-child{margin:0}
+#s-stats .h1row .mpick{max-width:150px}
+.tabbar{--tabh:64px}.tabbar button{height:64px;font-size:11.5px;position:relative}.tabbar button.on::before{content:'';position:absolute;top:0;width:28px;height:3px;border-radius:0 0 3px 3px;background:var(--primary)}
+main{padding-bottom:calc(64px + env(safe-area-inset-bottom) + 28px)}
+@media (min-width:420px){html,body{font-size:16px}main{padding-left:20px;padding-right:20px}.xl{font-size:56px}.xl2{font-size:42px}.best .money{font-size:32px}.cc-row svg{width:144px;height:144px}.wrow{font-size:14.5px}.card{padding:20px}}
