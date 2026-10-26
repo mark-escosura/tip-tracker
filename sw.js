@@ -1,5 +1,5 @@
 /* Side Work service worker: full offline cache. Bump VERSION when files change. */
-var VERSION = 'sidework-v15';
+var VERSION = 'sidework-v16';
 var ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.json', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-512-maskable.png', 'favicon-32.png', 'apple-touch-icon-dark.png', 'icon-192-dark.png', 'icon-512-dark.png', 'favicon-32-dark.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(VERSION).then(function (c) { return c.addAll(ASSETS); }).then(function () { return self.skipWaiting(); }));

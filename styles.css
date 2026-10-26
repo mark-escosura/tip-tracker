@@ -160,3 +160,6 @@ html[data-theme=light] .pill .down{color:#B91C1C}
 .iconpick button{flex:1;background:var(--input);border:2px solid var(--border);border-radius:16px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text);font:inherit;font-weight:600}
 .iconpick button[aria-pressed=true]{border-color:var(--primary)}
 .iconpick img{width:64px;height:64px;border-radius:15px}
+
+/* v16 backup */
+.bkrow{display:flex;gap:10px;margin-top:10px}.bkrow .btn{flex:1}

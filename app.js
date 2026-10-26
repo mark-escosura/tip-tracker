@@ -364,6 +364,24 @@
   function setSeg(id, v) { $$('#' + id + ' button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === v); });
     if (id === 'shiftsSeg') { $('#vList').hidden = v !== 'list'; $('#vCal').hidden = v !== 'cal'; }
     else { $('#rTips').hidden = v !== 'tips'; $('#rWeek').hidden = v !== 'week'; $('#rStats').hidden = v !== 'stats'; } }
+  /* ---------- backup / restore (on-device only) ---------- */
+  function backupData() { var d = {}; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k.indexOf('serverlife.') === 0) { var v = localStorage.getItem(k); try { d[k] = JSON.parse(v); } catch (e) { d[k] = v; } } }
+    return { app: 'Side Work', format: 1, exportedAt: new Date().toISOString(), data: d }; }
+  function doBackup() { var txt = JSON.stringify(backupData(), null, 1), name = 'sidework-backup-' + iso(new Date()) + '.json';
+    try { var f = new File([txt], name, { type: 'application/json' }); if (navigator.canShare && navigator.canShare({ files: [f] })) { navigator.share({ files: [f], title: 'Side Work backup' }).catch(function () {}); return; } } catch (e) {}
+    download(name, txt, 'application/json'); toast('Backup saved · ' + shifts.length + ' shift' + (shifts.length === 1 ? '' : 's')); }
+  function restoreFrom(obj) { var d = obj && obj.data && typeof obj.data === 'object' ? obj.data : obj, inc = Array.isArray(d) ? d : d && (d[K.shifts] || d.shifts);
+    if (!Array.isArray(inc)) return { error: 'That file has no Side Work shifts.' };
+    var ids = {}, keys = {}, added = 0, skipped = 0; shifts.forEach(function (s) { ids[s.id] = 1; keys[s.date + '|' + (s.clockIn || '')] = 1; });
+    if (d && !Array.isArray(d)) { var rl = d[K.roles]; if (Array.isArray(rl)) rl.forEach(function (r) { if (r && r.name && okWage(+r.wage) && !roleByName(r.name)) roles.push({ id: String(r.id || uid('r')), name: String(r.name).slice(0, 40), wage: r2(+r.wage) }); }); saveRoles();
+      var sc = d[K.sched]; if (Array.isArray(sc)) { sc.forEach(function (x) { if (validSched(x) && !sched.some(function (y) { return y.id === x.id; })) sched.push(x); }); saveSched(); }
+      [K.goals, K.theme, K.icon].forEach(function (k) { if (d[k] != null && localStorage.getItem(k) == null) localStorage.setItem(k, typeof d[k] === 'string' ? d[k] : JSON.stringify(d[k])); }); }
+    inc.forEach(function (s) { var m = migrate(s); if (!m) { skipped++; return; } var k = m.date + '|' + (m.clockIn || ''); if (ids[m.id] || keys[k]) { skipped++; return; } ids[m.id] = keys[k] = 1; shifts.push(m); added++; });
+    save(); return { added: added, skipped: skipped }; }
+  function onRestoreFile(e) { var f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return; var rd = new FileReader();
+    rd.onload = function () { var obj; try { obj = JSON.parse(rd.result); } catch (x) { toast('Could not read that file'); return; } var r = restoreFrom(obj);
+      if (r.error) { toast(r.error); return; } renderRoleSettings(); renderAll(); toast('Restored ' + r.added + ' shift' + (r.added === 1 ? '' : 's') + (r.skipped ? ' · ' + r.skipped + ' already here' : '')); };
+    rd.readAsText(f); }
   var toastT; function toast(m) { var t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove('on'); }, 2600); }
   function renderAll() { renderMonthPick(); renderBanner(); renderDashboard(); renderHistory(); renderCalendar(); renderTips(); renderReports(); renderInsightsEmpty(); }
 
@@ -400,6 +418,7 @@
     ['#gWeek', '#gMonth'].forEach(function (s) { $(s).addEventListener('change', function () { var v = num(this.value), g = getJSON(K.goals) || {}; if (v != null && (isNaN(v) || v < 0)) { toast('Goal should be a number'); this.value = ''; return; }
       g[s === '#gWeek' ? 'week' : 'month'] = v ? r2(v) : null; setJSON(K.goals, g); renderReports(); }); });
     $('#csvBtn').addEventListener('click', exportCSV); $('#repCsv').addEventListener('click', exportCSV);
+    $('#backupBtn').addEventListener('click', doBackup); $('#restoreBtn').addEventListener('click', function () { $('#restoreFile').click(); }); $('#restoreFile').addEventListener('change', onRestoreFile);
     $('#iconPick').addEventListener('click', function (e) { var b = e.target.closest('[data-icon]'); if (!b) return; var v = b.getAttribute('data-icon'); localStorage.setItem(K.icon, v); applyIcon(v); toast(v === 'dark' ? 'Dark icon on' : 'Green icon on'); });
     $('#darkToggle').addEventListener('change', function () { var t = this.checked ? 'dark' : 'light'; localStorage.setItem(K.theme, t); applyTheme(t); });
     $('#roleList').addEventListener('change', function (e) { if (rolesRendering) return; var row = e.target.closest('.role-row'); if (!row) return; var r = roles.find(function (x) { return x.id === row.getAttribute('data-id'); }); if (!r) return;

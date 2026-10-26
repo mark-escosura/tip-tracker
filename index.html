@@ -154,6 +154,9 @@
     <div class="card">
       <p class="lbl">Your data</p>
       <button class="btn primary wide" id="csvBtn">Export CSV</button>
+      <div class="bkrow"><button type="button" class="btn wide" id="backupBtn">Backup</button><button type="button" class="btn wide" id="restoreBtn">Restore</button></div>
+      <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+      <p class="muted xs">Backup saves a file of all your app data. Restore adds shifts from a backup file without duplicates.</p>
       <p class="muted xs">Everything stays on this phone. No accounts, no bank, nothing shared.</p>
     </div>
   
